@@ -37,3 +37,7 @@ def create_app():
         return render_template('reflect.html')
 
     return app
+
+
+if __name__ == '__main__':
+    create_app().run(debug=True)

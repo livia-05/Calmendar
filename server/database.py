@@ -30,3 +30,8 @@ def init_db():
 
 def init_app(app):
     app.teardown_appcontext(close_db)
+
+
+if __name__ == '__main__':
+    init_db()
+    print(f'Database initialized at {DATABASE}')
