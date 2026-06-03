@@ -6,8 +6,11 @@ from server.routes.reflections import reflections_bp
 from server.routes.breaks import breaks_bp
 
 
-def create_app():
+def create_app(test_config=None):
     app = Flask(__name__, template_folder='templates', static_folder='static')
+
+    if test_config:
+        app.config.update(test_config)
 
     init_app(app)
 

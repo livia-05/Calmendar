@@ -1,4 +1,5 @@
 import random
+import sqlite3
 from flask import Blueprint, request, jsonify
 from server.database import get_db
 
@@ -61,10 +62,13 @@ def create_reflection():
     if not data or not data.get('date'):
         return jsonify({'error': 'date is required'}), 400
     db = get_db()
-    cursor = db.execute(
-        'INSERT INTO reflections (date, mood, notes, ai_summary) VALUES (?, ?, ?, ?)',
-        (data['date'], data.get('mood'), data.get('notes'), data.get('ai_summary'))
-    )
+    try:
+        cursor = db.execute(
+            'INSERT INTO reflections (date, mood, notes, ai_summary) VALUES (?, ?, ?, ?)',
+            (data['date'], data.get('mood'), data.get('notes'), data.get('ai_summary'))
+        )
+    except sqlite3.IntegrityError:
+        return jsonify({'error': 'A reflection for this date already exists'}), 409
     db.commit()
     row = db.execute('SELECT * FROM reflections WHERE id = ?', (cursor.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201

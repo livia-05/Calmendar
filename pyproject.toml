@@ -8,6 +8,12 @@ dependencies = [
     "anthropic>=0.30.0",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["server"]
 
