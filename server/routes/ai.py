@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from server.ai import analyze_schedule, suggest_break
+from server.ai import analyze_schedule, suggest_break, suggest_break_local
 
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
 
@@ -22,5 +22,6 @@ def break_suggestion():
         return jsonify({'error': 'date is required'}), 400
     try:
         return jsonify(suggest_break(data['date']))
-    except Exception as e:
-        return jsonify({'error': str(e)}), 503
+    except Exception:
+        # Fall back to rule-based local suggestion (no API key needed)
+        return jsonify(suggest_break_local(data['date']))

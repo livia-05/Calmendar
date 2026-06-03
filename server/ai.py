@@ -1,8 +1,205 @@
 import os
 import re
 import json
+import random
+import hashlib
 import anthropic
 from server.database import get_db
+
+
+# ── Local (no-API) suggestion pool ──────────────────────────────────────────
+
+_ACTIVITY_POOL = [
+    {
+        "name": "Go for a walk",
+        "description": "Head outside for a short walk — around the block or somewhere nearby.",
+        "short_mins": 10, "long_mins": 20,
+        "hobby_keywords": ["hiking", "walk", "outdoor", "nature", "running", "exercise"],
+        "tags": ["physical", "outdoor", "screen_free"],
+        "reason": "Getting outside and moving clears your head after focused work."
+    },
+    {
+        "name": "Listen to music",
+        "description": "Put on a favorite album or playlist, close your eyes, and just listen.",
+        "short_mins": 10, "long_mins": 25,
+        "hobby_keywords": ["music", "guitar", "piano", "singing", "concert", "band"],
+        "tags": ["creative", "relaxing", "screen_free"],
+        "reason": "Music you enjoy is one of the fastest ways to decompress between tasks."
+    },
+    {
+        "name": "Stretch or do yoga",
+        "description": "A few gentle stretches or a short yoga flow to release tension in your body.",
+        "short_mins": 5, "long_mins": 20,
+        "hobby_keywords": ["yoga", "stretch", "fitness", "gym", "pilates", "exercise"],
+        "tags": ["physical", "mindful", "screen_free"],
+        "reason": "Stretching counteracts the tension that builds up during long periods of sitting."
+    },
+    {
+        "name": "Read a few pages",
+        "description": "Pick up your book and read a few pages — no pressure to finish anything.",
+        "short_mins": 10, "long_mins": 30,
+        "hobby_keywords": ["reading", "books", "novel", "literature", "fiction"],
+        "tags": ["quiet", "screen_free", "relaxing"],
+        "reason": "Reading gives your analytical mind a rest while keeping you pleasantly engaged."
+    },
+    {
+        "name": "Make tea or a snack",
+        "description": "Step away from your screen, go to the kitchen, and make something to enjoy.",
+        "short_mins": 5, "long_mins": 10,
+        "hobby_keywords": ["cooking", "baking", "food", "coffee", "tea", "kitchen"],
+        "tags": ["screen_free", "relaxing"],
+        "reason": "A small ritual like making food gives you a satisfying, natural scene change."
+    },
+    {
+        "name": "Sketch or doodle",
+        "description": "Grab any pen and paper and draw whatever comes to mind — no goal, just flow.",
+        "short_mins": 10, "long_mins": 20,
+        "hobby_keywords": ["art", "drawing", "painting", "sketch", "illustration", "creative", "design"],
+        "tags": ["creative", "screen_free", "relaxing"],
+        "reason": "Unstructured drawing lets your mind wander freely, which is exactly what recharges it."
+    },
+    {
+        "name": "Quick meditation",
+        "description": "Sit comfortably, close your eyes, and focus on your breathing for a few minutes.",
+        "short_mins": 5, "long_mins": 15,
+        "hobby_keywords": ["meditation", "mindful", "mindfulness", "yoga", "calm", "zen"],
+        "tags": ["mindful", "screen_free", "quiet"],
+        "reason": "Even a brief breathing pause measurably reduces stress and sharpens focus."
+    },
+    {
+        "name": "Watch something short",
+        "description": "Pull up a short video or an episode of something you enjoy and fully relax.",
+        "short_mins": 15, "long_mins": 30,
+        "hobby_keywords": ["tv", "movies", "netflix", "youtube", "film", "anime", "shows"],
+        "tags": ["screen", "entertaining", "relaxing"],
+        "reason": "Passive entertainment lets your brain rest without demanding more from you."
+    },
+    {
+        "name": "Write in a journal",
+        "description": "Spend a few minutes writing whatever is on your mind — thoughts, feelings, anything.",
+        "short_mins": 5, "long_mins": 15,
+        "hobby_keywords": ["journaling", "writing", "diary", "blogging", "journal"],
+        "tags": ["reflective", "screen_free", "quiet"],
+        "reason": "Getting thoughts out of your head and onto paper clears mental clutter."
+    },
+    {
+        "name": "Quick workout",
+        "description": "A few minutes of jumping jacks, push-ups, or whatever exercise you enjoy.",
+        "short_mins": 5, "long_mins": 20,
+        "hobby_keywords": ["gym", "fitness", "workout", "exercise", "running", "sport", "crossfit"],
+        "tags": ["physical", "energetic", "screen_free"],
+        "reason": "Short bursts of exercise release endorphins and boost your energy almost immediately."
+    },
+    {
+        "name": "Text or call a friend",
+        "description": "Reach out to someone — even a quick message to check in goes a long way.",
+        "short_mins": 5, "long_mins": 15,
+        "hobby_keywords": ["social", "friends", "family", "people", "chat"],
+        "tags": ["social", "relaxing"],
+        "reason": "A quick social connection reminds you there is life outside the to-do list."
+    },
+    {
+        "name": "Step outside for fresh air",
+        "description": "Go outside, even just to your doorstep or balcony, and breathe for a minute.",
+        "short_mins": 5, "long_mins": 10,
+        "hobby_keywords": ["outdoor", "nature", "garden", "balcony"],
+        "tags": ["outdoor", "screen_free", "mindful"],
+        "reason": "Fresh air and a change of scenery is one of the simplest and most effective resets."
+    },
+]
+
+_SCREEN_WORK_WORDS = {
+    'computer', 'coding', 'code', 'screen', 'design', 'writing', 'office',
+    'desk', 'remote', 'laptop', 'developer', 'engineer', 'analyst', 'research',
+    'editing', 'student', 'studying', 'homework', 'assignment',
+}
+
+
+def suggest_break_local(date):
+    """Rule-based break suggestion using profile + today's tasks + recent task history.
+    No API key required."""
+    db = get_db()
+    profile = db.execute('SELECT * FROM user_profile ORDER BY id LIMIT 1').fetchone()
+    today_tasks = db.execute(
+        'SELECT * FROM tasks WHERE date = ? ORDER BY start_time', (date,)
+    ).fetchall()
+    recent_tasks = db.execute(
+        "SELECT * FROM tasks WHERE date < ? AND date >= date(?, '-7 days')",
+        (date, date)
+    ).fetchall()
+
+    hobbies     = (profile['hobbies'] or '').lower()           if profile else ''
+    work        = (profile['work_description'] or '').lower()  if profile else ''
+    break_style = profile['break_style']                       if profile else 'frequent_short'
+
+    # Detect screen-heavy work from profile
+    screen_heavy = any(w in work for w in _SCREEN_WORK_WORDS)
+
+    # Collect task categories from today + recent days for context
+    def _cats(tasks):
+        return [t['category'].lower() for t in tasks if t['category']]
+
+    today_cats  = _cats(today_tasks)
+    recent_cats = _cats(recent_tasks)
+    all_cats    = today_cats + recent_cats
+
+    # Dominant category this week (most frequent)
+    dominant = max(set(all_cats), key=all_cats.count) if all_cats else None
+
+    # If most tasks are screen/work/study, treat as screen-heavy regardless of profile
+    screen_task_words = {'work', 'study', 'school', 'coding', 'homework', 'writing', 'research'}
+    if dominant and any(w in dominant for w in screen_task_words):
+        screen_heavy = True
+
+    # Date-based offset so suggestions rotate day to day
+    day_seed = int(hashlib.md5(date.encode()).hexdigest(), 16)
+
+    scored = []
+    for i, act in enumerate(_ACTIVITY_POOL):
+        score = 0.0
+
+        # Hobby keyword match — strongest signal
+        for kw in act['hobby_keywords']:
+            if kw in hobbies:
+                score += 5
+
+        # Boost screen-free activities for screen-heavy workers/days
+        if screen_heavy and 'screen_free' in act['tags']:
+            score += 3
+        # Penalise screen entertainment for screen-heavy days
+        if screen_heavy and 'screen' in act['tags'] and 'screen_free' not in act['tags']:
+            score -= 3
+
+        # Boost physical/outdoor if today is packed with desk-style tasks
+        if screen_heavy and 'physical' in act['tags']:
+            score += 2
+        if screen_heavy and 'outdoor' in act['tags']:
+            score += 1
+
+        # Variety: rotate priority across activities using a daily seed
+        variety = ((i + day_seed) % len(_ACTIVITY_POOL)) / len(_ACTIVITY_POOL)
+        score += variety
+
+        scored.append((score, i, act))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best = scored[0][2]
+
+    duration = best['short_mins'] if break_style == 'frequent_short' else best['long_mins']
+
+    # Personalise the reason with today's context when possible
+    reason = best['reason']
+    if dominant and screen_heavy and 'screen_free' in best['tags']:
+        reason = f"After a day of {dominant} work, stepping away from your screen will help you recharge. {reason}"
+    elif dominant:
+        reason = f"With a day focused on {dominant}, {reason[0].lower()}{reason[1:]}"
+
+    return {
+        "name": best['name'],
+        "description": best['description'],
+        "duration_minutes": duration,
+        "reason": reason,
+    }
 
 _client = None
 MODEL_FAST = 'claude-haiku-4-5-20251001'
