@@ -100,7 +100,14 @@ def generate_summary(date):
     pending    = [t for t in tasks if t['status'] != 'completed']
     reflection = db.execute('SELECT * FROM reflections WHERE date = ?', (date,)).fetchone()
 
-    summary = _build_summary(completed, pending)
+    mood  = reflection['mood']  if reflection else None
+    notes = reflection['notes'] if reflection else None
+
+    try:
+        from server.ai import generate_day_summary
+        summary = generate_day_summary(date, completed, pending, mood, notes)
+    except Exception:
+        summary = _build_summary(completed, pending)
 
     if reflection:
         db.execute('UPDATE reflections SET ai_summary = ? WHERE date = ?', (summary, date))

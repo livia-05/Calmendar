@@ -28,13 +28,17 @@
     <div class="task-panel-inner">
 
       <div class="warn-banner" id="warn-banner">
-        ⚠ Your day looks overscheduled. Consider moving some tasks to another day.
+        ⚠ <span id="warn-msg">Your day looks overscheduled. Consider moving some tasks to another day.</span>
       </div>
 
       <div class="break-banner" id="break-banner">
-        <span>💡 You've got a full schedule — remember to take a <b>break</b>.</span>
-        <a href="/reflect" class="btn btn-ghost" style="font-size:12px;padding:5px 11px;white-space:nowrap">End of Day →</a>
+        <span class="break-msg" id="break-msg">💡 You've got a full schedule — remember to take a break.</span>
+        <div class="break-actions">
+          <button class="btn btn-ghost" style="font-size:12px;padding:5px 11px;white-space:nowrap" onclick="getSuggestion()">✦ Suggest</button>
+          <a href="/reflect" class="btn btn-ghost" style="font-size:12px;padding:5px 11px;white-space:nowrap">End of Day →</a>
+        </div>
       </div>
+      <div class="suggestion-card" id="suggestion-card"></div>
 
       <div class="task-panel-header">
         <div>
@@ -214,11 +218,33 @@ async function deleteTask(id) {
   allTasks = allTasks.filter(t => t.id !== id);
   renderList(allTasks, activeFilter);
   renderTimeline(allTasks);
-  checkWarnings(allTasks);
+  refreshAiInsights(currentDate, allTasks);
 }
 
 // ── Warnings ──
-function checkWarnings(tasks) {
+async function refreshAiInsights(date, tasks) {
+  try {
+    const result = await apiFetch('POST', '/api/ai/schedule-analysis', { date });
+    if (!result || result.error) { _warningsFallback(tasks); return; }
+
+    const warnBanner  = document.getElementById('warn-banner');
+    const breakBanner = document.getElementById('break-banner');
+
+    warnBanner.style.display = result.overscheduled ? 'block' : 'none';
+    if (result.overscheduled && result.overscheduled_message) {
+      document.getElementById('warn-msg').textContent = result.overscheduled_message;
+    }
+
+    breakBanner.style.display = result.needs_break ? 'flex' : 'none';
+    if (result.needs_break && result.break_message) {
+      document.getElementById('break-msg').textContent = '💡 ' + result.break_message;
+    }
+  } catch {
+    _warningsFallback(tasks);
+  }
+}
+
+function _warningsFallback(tasks) {
   let totalMin = 0;
   for (const t of tasks) {
     if (t.start_time && t.end_time) {
@@ -228,8 +254,28 @@ function checkWarnings(tasks) {
     }
   }
   const hrs = totalMin / 60;
-  document.getElementById('warn-banner').style.display  = hrs > 6    ? 'block' : 'none';
-  document.getElementById('break-banner').style.display = hrs >= 2   ? 'flex'  : 'none';
+  document.getElementById('warn-banner').style.display  = hrs > 6  ? 'block' : 'none';
+  document.getElementById('break-banner').style.display = hrs >= 2 ? 'flex'  : 'none';
+}
+
+// ── Break suggestion ──
+async function getSuggestion() {
+  const card = document.getElementById('suggestion-card');
+  card.innerHTML = '<span class="spinner"></span> Finding the right break for you…';
+  card.classList.add('visible');
+
+  try {
+    const s = await apiFetch('POST', '/api/ai/break-suggestion', { date: currentDate });
+    if (!s || s.error) { card.classList.remove('visible'); return; }
+    card.innerHTML = `
+      <button class="sug-dismiss" onclick="document.getElementById('suggestion-card').classList.remove('visible')">×</button>
+      <div class="sug-name">${escHtml(s.name)} · ${s.duration_minutes} min</div>
+      <div class="sug-desc">${escHtml(s.description)}</div>
+      <div class="sug-reason">${escHtml(s.reason)}</div>
+    `;
+  } catch {
+    card.classList.remove('visible');
+  }
 }
 
 // ── Modal ──
@@ -259,7 +305,7 @@ async function submitTask(e) {
     allTasks.push(task);
     renderList(allTasks, activeFilter);
     renderTimeline(allTasks);
-    checkWarnings(allTasks);
+    refreshAiInsights(currentDate, allTasks);
   }
   closeModal();
 }
@@ -285,7 +331,7 @@ async function loadDay(date) {
   allTasks = await apiFetch('GET', `/api/tasks?date=${date}`);
   renderTimeline(allTasks);
   renderList(allTasks, activeFilter);
-  checkWarnings(allTasks);
+  refreshAiInsights(date, allTasks);
 }
 
 loadDay(currentDate);

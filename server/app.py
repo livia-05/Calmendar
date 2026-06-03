@@ -4,6 +4,7 @@ from server.routes.tasks import tasks_bp
 from server.routes.profile import profile_bp
 from server.routes.reflections import reflections_bp
 from server.routes.breaks import breaks_bp
+from server.routes.ai import ai_bp
 
 
 def create_app(test_config=None):
@@ -21,6 +22,7 @@ def create_app(test_config=None):
     app.register_blueprint(profile_bp)
     app.register_blueprint(reflections_bp)
     app.register_blueprint(breaks_bp)
+    app.register_blueprint(ai_bp)
 
     @app.route('/')
     def index():
