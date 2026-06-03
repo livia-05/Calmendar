@@ -94,7 +94,13 @@ High-priority or cognitively heavy tasks should lower the threshold. Be warm and
         messages=[{'role': 'user', 'content': prompt}]
     )
 
-    return json.loads(response.content[0].text)
+    result = json.loads(response.content[0].text)
+    # If the day is overscheduled, a break nudge should always show too
+    if result.get('overscheduled') and not result.get('needs_break'):
+        result['needs_break'] = True
+        if not result.get('break_message'):
+            result['break_message'] = "With a day this packed, a short break will help you stay focused and finish strong."
+    return result
 
 
 def suggest_break(date):

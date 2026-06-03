@@ -1,7 +1,14 @@
 import random
 import sqlite3
+from datetime import date as _date, timedelta
 from flask import Blueprint, request, jsonify
 from server.database import get_db
+
+
+def _cleanup_old_reflections(db):
+    cutoff = (_date.today() - timedelta(days=7)).isoformat()
+    db.execute('DELETE FROM reflections WHERE date < ?', (cutoff,))
+    db.commit()
 
 _CLOSERS = [
     "Rest well tonight — you showed up today and that's what matters.",
@@ -46,7 +53,9 @@ reflections_bp = Blueprint('reflections', __name__, url_prefix='/api/reflections
 
 @reflections_bp.route('', methods=['GET'])
 def get_reflections():
-    rows = get_db().execute('SELECT * FROM reflections ORDER BY date DESC').fetchall()
+    db = get_db()
+    _cleanup_old_reflections(db)
+    rows = db.execute('SELECT * FROM reflections ORDER BY date DESC').fetchall()
     return jsonify([dict(r) for r in rows])
 
 
@@ -61,6 +70,8 @@ def create_reflection():
     data = request.get_json()
     if not data or not data.get('date'):
         return jsonify({'error': 'date is required'}), 400
+    if data['date'] > _date.today().isoformat():
+        return jsonify({'error': 'Cannot create a reflection for a future date'}), 400
     db = get_db()
     try:
         cursor = db.execute(
@@ -94,6 +105,8 @@ def update_reflection(date):
 
 @reflections_bp.route('/<date>/summary', methods=['POST'])
 def generate_summary(date):
+    if date > _date.today().isoformat():
+        return jsonify({'error': 'Cannot generate a summary for a future date'}), 400
     db         = get_db()
     tasks      = db.execute('SELECT * FROM tasks WHERE date = ? ORDER BY start_time', (date,)).fetchall()
     completed  = [t for t in tasks if t['status'] == 'completed']

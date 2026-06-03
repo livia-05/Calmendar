@@ -184,17 +184,27 @@ function taskRow(t) {
     : '';
   const cat     = t.category ? ` · ${escHtml(t.category)}` : '';
   const meta    = (timeStr || cat) ? `<div class="task-meta">${timeStr}${cat}</div>` : '';
+  const notes   = t.notes
+    ? `<div class="task-notes" id="notes-${t.id}">${escHtml(t.notes)}</div>`
+    : '';
+  const infoClass = t.notes ? 'task-info expandable' : 'task-info';
+  const toggle    = t.notes ? `toggleNotes(${t.id})` : '';
   return `<div class="task-row ${t.status === 'completed' ? 'done' : ''}" id="tr-${t.id}">
     <button class="status-btn ${t.status}" onclick="cycleStatus(${t.id},'${t.status}')">
       ${STATUS_ICON[t.status]}
     </button>
-    <div class="task-info">
+    <div class="${infoClass}" onclick="${toggle}">
       <div class="task-title">${escHtml(t.title)}</div>
       ${meta}
+      ${notes}
     </div>
     <div class="pip ${t.priority}"></div>
     <button class="task-del" onclick="deleteTask(${t.id})">×</button>
   </div>`;
+}
+
+function toggleNotes(id) {
+  document.getElementById(`notes-${id}`)?.classList.toggle('open');
 }
 
 function highlightTask(id) {

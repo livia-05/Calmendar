@@ -52,9 +52,9 @@
   <!-- Notes -->
   <div class="rf-section">
     <div class="sec-title">Any thoughts?</div>
-    <textarea id="rf-notes" placeholder="Anything on your mind from today…" rows="4" style="width:100%;margin-bottom:14px"></textarea>
+    <textarea id="rf-notes" placeholder="Anything on your mind from today…" rows="4"
+      style="width:100%;margin-bottom:14px" onblur="autoSave()"></textarea>
     <div class="rf-actions">
-      <button class="btn btn-ghost" id="save-btn" onclick="saveReflection()">Save</button>
       <button class="btn btn-primary" id="gen-btn" onclick="generateSummary()">✦ Summarize My Day</button>
     </div>
   </div>
@@ -62,18 +62,29 @@
   <!-- AI summary -->
   <div class="ai-box" id="ai-box"></div>
 
+  <!-- Previous reflections -->
+  <div class="rf-section" style="margin-top:36px">
+    <button class="btn btn-ghost" style="width:100%" onclick="togglePrevious()">📋 Previous Reflections</button>
+    <div id="prev-list" style="display:none;margin-top:14px"></div>
+  </div>
+
+  <!-- Exit -->
+  <div style="text-align:center;margin-top:28px;padding-bottom:48px">
+    <a href="/" class="btn btn-ghost">← Exit to Planner</a>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let selectedMood = null;
-const date = todayStr();
+const today = todayStr();
 
 async function loadDay() {
-  document.getElementById('rf-date').textContent = fmtDate(date);
+  document.getElementById('rf-date').textContent = fmtDate(today);
 
-  const tasks     = await apiFetch('GET', `/api/tasks?date=${date}`);
+  const tasks     = await apiFetch('GET', `/api/tasks?date=${today}`);
   const completed = tasks.filter(t => t.status === 'completed');
   const pending   = tasks.filter(t => t.status !== 'completed');
 
@@ -89,44 +100,38 @@ async function loadDay() {
     ? pending.map(t => `<div class="acc-item pend"><span class="ico">○</span>${escHtml(t.title)}</div>`).join('')
     : `<p style="color:var(--muted);font-size:13px">All tasks completed 🎉</p>`;
 
-  const existing = await apiFetch('GET', `/api/reflections/${date}`);
-  if (existing) {
-    if (existing.mood)       selectMood(existing.mood);
-    if (existing.notes)      document.getElementById('rf-notes').value = existing.notes;
-    if (existing.ai_summary) showSummary(existing.ai_summary);
-  }
+  // Fresh start — no pre-population of mood/notes
 }
 
 function selectMood(n) {
   selectedMood = n;
   document.querySelectorAll('.mood-btn').forEach((b, i) => b.classList.toggle('sel', i + 1 === n));
+  autoSave();
 }
 
-async function saveReflection() {
-  const notes    = document.getElementById('rf-notes').value.trim() || null;
-  const existing = await apiFetch('GET', `/api/reflections/${date}`);
+async function autoSave() {
+  const notes = document.getElementById('rf-notes').value.trim() || null;
+  if (!selectedMood && !notes) return;
+  const existing = await apiFetch('GET', `/api/reflections/${today}`);
   if (existing) {
-    await apiFetch('PUT', `/api/reflections/${date}`, { mood: selectedMood, notes });
+    await apiFetch('PUT', `/api/reflections/${today}`, { mood: selectedMood, notes });
   } else {
-    await apiFetch('POST', '/api/reflections', { date, mood: selectedMood, notes });
+    await apiFetch('POST', '/api/reflections', { date: today, mood: selectedMood, notes });
   }
-  const btn = document.getElementById('save-btn');
-  btn.textContent = 'Saved ✓';
-  setTimeout(() => btn.textContent = 'Save', 2000);
 }
 
 async function generateSummary() {
-  await saveReflection();
+  await autoSave();
   const btn = document.getElementById('gen-btn');
   btn.innerHTML = '<span class="spinner"></span>Generating…';
   btn.disabled = true;
   try {
-    const r = await apiFetch('POST', `/api/reflections/${date}/summary`);
+    const r = await apiFetch('POST', `/api/reflections/${today}/summary`);
     if (r && r.ai_summary) showSummary(r.ai_summary);
   } catch {
     alert('Could not generate summary. Make sure ANTHROPIC_API_KEY is set.');
   }
-  btn.innerHTML = '✦ Generate Summary';
+  btn.innerHTML = '✦ Summarize My Day';
   btn.disabled = false;
 }
 
@@ -135,6 +140,38 @@ function showSummary(text) {
   box.textContent = text;
   box.style.display = 'block';
   box.scrollIntoView({ behavior: 'smooth' });
+}
+
+const MOODS = ['😩', '😔', '😐', '🙂', '😊'];
+let prevLoaded = false;
+
+async function togglePrevious() {
+  const list = document.getElementById('prev-list');
+  if (list.style.display === 'none') {
+    list.style.display = 'block';
+    if (!prevLoaded) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:13px">Loading…</p>';
+      const all  = await apiFetch('GET', '/api/reflections');
+      const past = all.filter(r => r.date < today);
+      prevLoaded = true;
+      if (!past.length) {
+        list.innerHTML = '<p style="color:var(--muted);font-size:13px">No previous reflections saved.</p>';
+      } else {
+        list.innerHTML = past.map(r => `
+          <div class="prev-item">
+            <div class="prev-header">
+              <span class="prev-date">${fmtDate(r.date)}</span>
+              ${r.mood ? `<span class="prev-mood">${MOODS[r.mood - 1]}</span>` : ''}
+            </div>
+            ${r.notes     ? `<div class="prev-notes">${escHtml(r.notes)}</div>` : ''}
+            ${r.ai_summary ? `<div class="prev-summary">${escHtml(r.ai_summary)}</div>` : ''}
+          </div>
+        `).join('');
+      }
+    }
+  } else {
+    list.style.display = 'none';
+  }
 }
 
 loadDay();
