@@ -1,7 +1,44 @@
-import os
-import anthropic
+import random
 from flask import Blueprint, request, jsonify
 from server.database import get_db
+
+_CLOSERS = [
+    "Rest well tonight — you showed up today and that's what matters.",
+    "Progress, not perfection, is what moves you forward. Keep going.",
+    "Small steps every day lead to big changes over time.",
+    "Tomorrow is a fresh start, and you're already more prepared than you know.",
+    "It's okay if everything didn't go as planned — that's just part of being human.",
+    "Your effort today plants seeds for a better tomorrow.",
+    "Every task you tackle, big or small, is a step in the right direction.",
+    "You're doing better than you think. Take a breath and be proud.",
+    "Consistency beats intensity — showing up daily is the whole game.",
+    "Be kind to yourself tonight. You did what you could with what you had.",
+]
+
+
+def _build_summary(completed, pending):
+    parts = []
+
+    if completed:
+        if len(completed) == 1:
+            parts.append(f'You completed "{completed[0]["title"]}" today — nice work.')
+        else:
+            listed = ', '.join(f'"{t["title"]}"' for t in completed[:2])
+            extra  = f' and {len(completed) - 2} more' if len(completed) > 2 else ''
+            parts.append(f'You wrapped up {len(completed)} tasks today, including {listed}{extra}.')
+    else:
+        parts.append('Today was a lighter day in terms of completed tasks — and that\'s okay.')
+
+    if pending:
+        if len(pending) == 1:
+            parts.append(f'"{pending[0]["title"]}" is still on your list for tomorrow.')
+        else:
+            parts.append(f'{len(pending)} tasks are still ahead — you can pick those up tomorrow fresh.')
+    else:
+        parts.append('Everything on your list is done — that\'s a great feeling.')
+
+    parts.append(random.choice(_CLOSERS))
+    return ' '.join(parts)
 
 reflections_bp = Blueprint('reflections', __name__, url_prefix='/api/reflections')
 
@@ -53,50 +90,13 @@ def update_reflection(date):
 
 @reflections_bp.route('/<date>/summary', methods=['POST'])
 def generate_summary(date):
-    db = get_db()
+    db         = get_db()
     tasks      = db.execute('SELECT * FROM tasks WHERE date = ? ORDER BY start_time', (date,)).fetchall()
     completed  = [t for t in tasks if t['status'] == 'completed']
     pending    = [t for t in tasks if t['status'] != 'completed']
     reflection = db.execute('SELECT * FROM reflections WHERE date = ?', (date,)).fetchone()
 
-    done_list  = '\n'.join(f'- {t["title"]}' for t in completed) or 'None'
-    pend_list  = '\n'.join(f'- {t["title"]}' for t in pending)  or 'None'
-    mood       = reflection['mood']  if reflection else None
-    notes      = reflection['notes'] if reflection else None
-
-    prompt = f"""You are a warm, calm daily planning assistant. A user has finished their day.
-
-Date: {date}
-Mood rating: {mood}/5
-User notes: {notes or 'None'}
-
-Completed today:
-{done_list}
-
-Still pending:
-{pend_list}
-
-Write a brief, personal end-of-day summary (3–4 sentences total):
-1. Acknowledge what was accomplished.
-2. Gently note anything left for tomorrow (if anything).
-3. Close with one warm, encouraging sentence.
-
-Tone: calm, genuine, supportive. Address the user as "you". No bullet points."""
-
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        return jsonify({'error': 'ANTHROPIC_API_KEY is not set'}), 500
-
-    try:
-        client  = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model='claude-haiku-4-5-20251001',
-            max_tokens=300,
-            messages=[{'role': 'user', 'content': prompt}]
-        )
-        summary = message.content[0].text
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    summary = _build_summary(completed, pending)
 
     if reflection:
         db.execute('UPDATE reflections SET ai_summary = ? WHERE date = ?', (summary, date))

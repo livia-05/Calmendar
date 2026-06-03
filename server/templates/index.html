@@ -108,8 +108,8 @@
 
 {% block scripts %}
 <script>
-const TL_START = 7;   // 7 am
-const TL_END   = 22;  // 10 pm
+const TL_START = 0;   // 12 am
+const TL_END   = 24;  // 12 am (next day)
 
 let currentDate  = todayStr();
 let allTasks     = [];
@@ -228,7 +228,7 @@ function checkWarnings(tasks) {
     }
   }
   const hrs = totalMin / 60;
-  document.getElementById('warn-banner').style.display  = hrs > 8    ? 'block' : 'none';
+  document.getElementById('warn-banner').style.display  = hrs > 6    ? 'block' : 'none';
   document.getElementById('break-banner').style.display = hrs >= 2   ? 'flex'  : 'none';
 }
 

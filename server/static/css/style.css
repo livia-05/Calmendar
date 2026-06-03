@@ -79,7 +79,7 @@ body {
 .tl-scroll {
   position: relative;
   margin-left: 52px; margin-right: 10px;
-  height: 900px; /* 15hrs × 60px */
+  height: 1440px; /* 24hrs × 60px */
 }
 .hour-line {
   position: absolute; left: -52px; right: 0;
