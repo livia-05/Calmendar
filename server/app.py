@@ -1,3 +1,4 @@
+from datetime import date as _date
 from flask import Flask, render_template, redirect, url_for
 from server.database import init_db, init_app, get_db
 from server.routes.tasks import tasks_bp
@@ -39,7 +40,7 @@ def create_app(test_config=None):
 
     @app.route('/reflect')
     def reflect():
-        return render_template('reflect.html')
+        return render_template('reflect.html', today=_date.today().isoformat())
 
     return app
 

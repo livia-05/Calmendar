@@ -87,6 +87,8 @@ def create_reflection():
 
 @reflections_bp.route('/<date>', methods=['PUT'])
 def update_reflection(date):
+    if date > _date.today().isoformat():
+        return jsonify({'error': 'Cannot update a reflection for a future date'}), 400
     data = request.get_json()
     db = get_db()
     row = db.execute('SELECT * FROM reflections WHERE date = ?', (date,)).fetchone()

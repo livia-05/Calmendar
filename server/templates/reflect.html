@@ -79,7 +79,7 @@
 {% block scripts %}
 <script>
 let selectedMood = null;
-const today = todayStr();
+const today = "{{ today }}";
 
 async function loadDay() {
   document.getElementById('rf-date').textContent = fmtDate(today);
