@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import anthropic
 from server.database import get_db
@@ -6,6 +7,12 @@ from server.database import get_db
 _client = None
 MODEL_FAST = 'claude-haiku-4-5-20251001'
 MODEL_FULL = 'claude-sonnet-4-6'
+
+
+def _parse_json(text):
+    text = re.sub(r'^```(?:json)?\s*', '', text.strip())
+    text = re.sub(r'\s*```$', '', text.strip())
+    return json.loads(text.strip())
 
 
 def _get_client():
@@ -149,7 +156,7 @@ Respond with ONLY a JSON object — no markdown:
         messages=[{'role': 'user', 'content': prompt}]
     )
 
-    return json.loads(response.content[0].text)
+    return _parse_json(response.content[0].text)
 
 
 def generate_day_summary(date, completed, pending, mood=None, notes=None):

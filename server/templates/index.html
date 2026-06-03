@@ -276,7 +276,10 @@ async function getSuggestion() {
 
   try {
     const s = await apiFetch('POST', '/api/ai/break-suggestion', { date: currentDate });
-    if (!s || s.error) { card.classList.remove('visible'); return; }
+    if (!s || s.error) {
+      card.innerHTML = `<span style="color:var(--muted)">${s?.error || 'Could not get a suggestion right now.'}</span>`;
+      return;
+    }
     card.innerHTML = `
       <button class="sug-dismiss" onclick="document.getElementById('suggestion-card').classList.remove('visible')">×</button>
       <div class="sug-name">${escHtml(s.name)} · ${s.duration_minutes} min</div>
@@ -284,7 +287,7 @@ async function getSuggestion() {
       <div class="sug-reason">${escHtml(s.reason)}</div>
     `;
   } catch {
-    card.classList.remove('visible');
+    card.innerHTML = `<span style="color:var(--muted)">Could not get a suggestion right now.</span>`;
   }
 }
 
