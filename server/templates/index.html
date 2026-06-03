@@ -1,6 +1,293 @@
 {% extends "base.html" %}
-{% block title %}Today — Calmendar{% endblock %}
+{% block title %}Calmendar{% endblock %}
+
 {% block content %}
-<h1>Good day, {{ profile.name }}</h1>
-<!-- Daily planner view — to be built out in the web UI phase -->
+<nav class="nav">
+  <span class="nav-brand">Calmendar</span>
+  <div class="nav-center">
+    <button class="btn-icon" onclick="shiftDate(-1)">←</button>
+    <span id="date-label"></span>
+    <button class="btn-icon" onclick="shiftDate(1)">→</button>
+  </div>
+  <div class="nav-actions">
+    <button class="btn btn-primary" onclick="openModal()">+ Task</button>
+    <a href="/reflect" class="btn btn-ghost">Reflect</a>
+  </div>
+</nav>
+
+<div class="planner">
+
+  <!-- Timeline -->
+  <div class="tl-panel">
+    <div class="tl-panel-title">Timeline</div>
+    <div class="tl-scroll" id="tl-scroll"></div>
+  </div>
+
+  <!-- Task list -->
+  <div class="task-panel">
+    <div class="task-panel-inner">
+
+      <div class="warn-banner" id="warn-banner">
+        ⚠ Your day looks overscheduled. Consider moving some tasks to another day.
+      </div>
+
+      <div class="break-banner" id="break-banner">
+        <span>💡 You've got a full schedule — remember to take a <b>break</b>.</span>
+        <a href="/reflect" class="btn btn-ghost" style="font-size:12px;padding:5px 11px;white-space:nowrap">End of Day →</a>
+      </div>
+
+      <div class="task-panel-header">
+        <div>
+          <h2 style="display:inline">Tasks</h2>
+          <span class="task-count" id="task-count"></span>
+        </div>
+      </div>
+
+      <div class="filter-tabs">
+        <button class="ftab active" data-f="all"          onclick="setFilter('all')">All</button>
+        <button class="ftab"        data-f="not_started"  onclick="setFilter('not_started')">○ To do</button>
+        <button class="ftab"        data-f="in_progress"  onclick="setFilter('in_progress')">◐ In progress</button>
+        <button class="ftab"        data-f="completed"    onclick="setFilter('completed')">● Done</button>
+      </div>
+
+      <div class="task-list" id="task-list"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Add task modal -->
+<div class="overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>New Task</h3>
+    <form id="task-form" onsubmit="submitTask(event)">
+      <div class="fg">
+        <label for="f-title">Title</label>
+        <input type="text" id="f-title" name="title" placeholder="What needs to get done?" required autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="f-date">Date</label>
+        <input type="date" id="f-date" name="date" required>
+      </div>
+      <div class="fg-row">
+        <div class="fg">
+          <label for="f-start">Start time</label>
+          <input type="time" id="f-start" name="start_time">
+        </div>
+        <div class="fg">
+          <label for="f-end">End time</label>
+          <input type="time" id="f-end" name="end_time">
+        </div>
+      </div>
+      <div class="fg-row">
+        <div class="fg">
+          <label for="f-priority">Priority</label>
+          <select id="f-priority" name="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label for="f-category">Category</label>
+          <input type="text" id="f-category" name="category" placeholder="work, health…">
+        </div>
+      </div>
+      <div class="fg">
+        <label for="f-notes">Notes</label>
+        <textarea id="f-notes" name="notes" placeholder="Any extra details…" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TL_START = 7;   // 7 am
+const TL_END   = 22;  // 10 pm
+
+let currentDate  = todayStr();
+let allTasks     = [];
+let activeFilter = 'all';
+
+// ── Timeline ──
+function renderTimeline(tasks) {
+  let html = '';
+
+  for (let h = TL_START; h <= TL_END; h++) {
+    const top   = (h - TL_START) * 60;
+    const label = `${h % 12 || 12}${h >= 12 ? 'pm' : 'am'}`;
+    html += `<div class="hour-line" style="top:${top}px">
+      <span class="hour-label">${label}</span>
+      <div class="hour-rule"></div>
+    </div>`;
+  }
+
+  for (const t of tasks) {
+    if (!t.start_time) continue;
+    const [sh, sm] = t.start_time.split(':').map(Number);
+    const startMin = (sh - TL_START) * 60 + sm;
+    let height = 50;
+    if (t.end_time) {
+      const [eh, em] = t.end_time.split(':').map(Number);
+      height = Math.max(24, (eh - TL_START) * 60 + em - startMin);
+    }
+    const fade = t.status === 'completed' ? 'opacity:0.35;' : '';
+    html += `<div class="tl-task p-${t.priority}"
+      style="top:${startMin}px;height:${height}px;${fade}"
+      onclick="highlightTask(${t.id})"
+      title="${escHtml(t.title)}">${escHtml(t.title)}</div>`;
+  }
+
+  document.getElementById('tl-scroll').innerHTML = html;
+}
+
+// ── Task list ──
+function renderList(tasks, filter) {
+  const visible = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
+  document.getElementById('task-count').textContent = `(${tasks.length})`;
+
+  if (!visible.length) {
+    document.getElementById('task-list').innerHTML =
+      `<div class="empty"><div class="empty-icon">📋</div>No tasks here. Add one!</div>`;
+    return;
+  }
+
+  const timed   = visible.filter(t =>  t.start_time);
+  const untimed = visible.filter(t => !t.start_time);
+  let html = '';
+
+  if (timed.length) {
+    html += '<div class="sec-lbl">Scheduled</div>';
+    html += timed.map(taskRow).join('');
+  }
+  if (untimed.length) {
+    html += '<div class="sec-lbl">Unscheduled</div>';
+    html += untimed.map(taskRow).join('');
+  }
+
+  document.getElementById('task-list').innerHTML = html;
+}
+
+function taskRow(t) {
+  const timeStr = t.start_time
+    ? `${fmt12(t.start_time)}${t.end_time ? ' – ' + fmt12(t.end_time) : ''}`
+    : '';
+  const cat     = t.category ? ` · ${escHtml(t.category)}` : '';
+  const meta    = (timeStr || cat) ? `<div class="task-meta">${timeStr}${cat}</div>` : '';
+  return `<div class="task-row ${t.status === 'completed' ? 'done' : ''}" id="tr-${t.id}">
+    <button class="status-btn ${t.status}" onclick="cycleStatus(${t.id},'${t.status}')">
+      ${STATUS_ICON[t.status]}
+    </button>
+    <div class="task-info">
+      <div class="task-title">${escHtml(t.title)}</div>
+      ${meta}
+    </div>
+    <div class="pip ${t.priority}"></div>
+    <button class="task-del" onclick="deleteTask(${t.id})">×</button>
+  </div>`;
+}
+
+function highlightTask(id) {
+  document.querySelectorAll('.task-row').forEach(r => r.style.borderColor = '');
+  const row = document.getElementById(`tr-${id}`);
+  if (row) { row.style.borderColor = 'var(--accent)'; row.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+}
+
+// ── Actions ──
+async function cycleStatus(id, current) {
+  const updated = await apiFetch('PUT', `/api/tasks/${id}`, { status: STATUS_NEXT[current] });
+  const idx = allTasks.findIndex(t => t.id === id);
+  if (idx !== -1) allTasks[idx] = updated;
+  renderList(allTasks, activeFilter);
+  renderTimeline(allTasks);
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  await apiFetch('DELETE', `/api/tasks/${id}`);
+  allTasks = allTasks.filter(t => t.id !== id);
+  renderList(allTasks, activeFilter);
+  renderTimeline(allTasks);
+  checkWarnings(allTasks);
+}
+
+// ── Warnings ──
+function checkWarnings(tasks) {
+  let totalMin = 0;
+  for (const t of tasks) {
+    if (t.start_time && t.end_time) {
+      const [sh, sm] = t.start_time.split(':').map(Number);
+      const [eh, em] = t.end_time.split(':').map(Number);
+      totalMin += (eh * 60 + em) - (sh * 60 + sm);
+    }
+  }
+  const hrs = totalMin / 60;
+  document.getElementById('warn-banner').style.display  = hrs > 8    ? 'block' : 'none';
+  document.getElementById('break-banner').style.display = hrs >= 2   ? 'flex'  : 'none';
+}
+
+// ── Modal ──
+function openModal() {
+  document.getElementById('task-form').reset();
+  document.getElementById('f-date').value = currentDate;
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('f-title').focus(), 50);
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+async function submitTask(e) {
+  e.preventDefault();
+  const f    = e.target;
+  const body = {
+    title:      f.title.value.trim(),
+    date:       f.date.value,
+    start_time: f.start_time.value || null,
+    end_time:   f.end_time.value   || null,
+    priority:   f.priority.value,
+    category:   f.category.value.trim() || null,
+    notes:      f.notes.value.trim()    || null,
+  };
+  const task = await apiFetch('POST', '/api/tasks', body);
+  if (task.date === currentDate) {
+    allTasks.push(task);
+    renderList(allTasks, activeFilter);
+    renderTimeline(allTasks);
+    checkWarnings(allTasks);
+  }
+  closeModal();
+}
+
+// ── Filter ──
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  renderList(allTasks, f);
+}
+
+// ── Date nav ──
+function shiftDate(n) {
+  const d = new Date(currentDate + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  loadDay(d.toISOString().slice(0, 10));
+}
+
+// ── Load ──
+async function loadDay(date) {
+  currentDate = date;
+  document.getElementById('date-label').textContent = fmtDate(date);
+  allTasks = await apiFetch('GET', `/api/tasks?date=${date}`);
+  renderTimeline(allTasks);
+  renderList(allTasks, activeFilter);
+  checkWarnings(allTasks);
+}
+
+loadDay(currentDate);
+</script>
 {% endblock %}

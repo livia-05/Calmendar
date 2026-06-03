@@ -1,6 +1,142 @@
 {% extends "base.html" %}
-{% block title %}End of Day — Calmendar{% endblock %}
+{% block title %}Reflect — Calmendar{% endblock %}
+
 {% block content %}
-<h1>End of Day Reflection</h1>
-<!-- Reflection view — to be built out in the web UI phase -->
+<div class="rf-wrap">
+
+  <a href="/" class="rf-back">← Back to planner</a>
+
+  <h1>End of Day</h1>
+  <p class="rf-sub" id="rf-date"></p>
+
+  <!-- Stats -->
+  <div class="rf-stats">
+    <div class="rf-stat">
+      <div class="num" id="done-count">—</div>
+      <div class="lbl">Completed</div>
+    </div>
+    <div class="rf-stat">
+      <div class="num" id="pend-count">—</div>
+      <div class="lbl">Still pending</div>
+    </div>
+    <div class="rf-stat">
+      <div class="num" id="total-count">—</div>
+      <div class="lbl">Total tasks</div>
+    </div>
+  </div>
+
+  <!-- Accomplished -->
+  <div class="rf-section">
+    <div class="sec-title">Accomplished today</div>
+    <div id="acc-list"></div>
+  </div>
+
+  <!-- Pending -->
+  <div class="rf-section">
+    <div class="sec-title">Carry forward</div>
+    <div id="pend-list"></div>
+  </div>
+
+  <!-- Mood -->
+  <div class="rf-section">
+    <div class="sec-title">How did today feel?</div>
+    <div class="mood-row">
+      <button class="mood-btn" onclick="selectMood(1)" title="Rough">😩</button>
+      <button class="mood-btn" onclick="selectMood(2)" title="Meh">😔</button>
+      <button class="mood-btn" onclick="selectMood(3)" title="Okay">😐</button>
+      <button class="mood-btn" onclick="selectMood(4)" title="Good">🙂</button>
+      <button class="mood-btn" onclick="selectMood(5)" title="Great">😊</button>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="rf-section">
+    <div class="sec-title">Any thoughts?</div>
+    <textarea id="rf-notes" placeholder="Anything on your mind from today…" rows="4" style="width:100%;margin-bottom:14px"></textarea>
+    <div class="rf-actions">
+      <button class="btn btn-ghost" id="save-btn" onclick="saveReflection()">Save</button>
+      <button class="btn btn-primary" id="gen-btn" onclick="generateSummary()">✦ Generate Summary</button>
+    </div>
+  </div>
+
+  <!-- AI summary -->
+  <div class="ai-box" id="ai-box"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedMood = null;
+const date = todayStr();
+
+async function loadDay() {
+  document.getElementById('rf-date').textContent = fmtDate(date);
+
+  const tasks     = await apiFetch('GET', `/api/tasks?date=${date}`);
+  const completed = tasks.filter(t => t.status === 'completed');
+  const pending   = tasks.filter(t => t.status !== 'completed');
+
+  document.getElementById('done-count').textContent  = completed.length;
+  document.getElementById('pend-count').textContent  = pending.length;
+  document.getElementById('total-count').textContent = tasks.length;
+
+  document.getElementById('acc-list').innerHTML = completed.length
+    ? completed.map(t => `<div class="acc-item done"><span class="ico">●</span>${escHtml(t.title)}</div>`).join('')
+    : `<p style="color:var(--muted);font-size:13px">Nothing completed yet — still time!</p>`;
+
+  document.getElementById('pend-list').innerHTML = pending.length
+    ? pending.map(t => `<div class="acc-item pend"><span class="ico">○</span>${escHtml(t.title)}</div>`).join('')
+    : `<p style="color:var(--muted);font-size:13px">All tasks completed 🎉</p>`;
+
+  const existing = await apiFetch('GET', `/api/reflections/${date}`);
+  if (existing) {
+    if (existing.mood)       selectMood(existing.mood);
+    if (existing.notes)      document.getElementById('rf-notes').value = existing.notes;
+    if (existing.ai_summary) showSummary(existing.ai_summary);
+  }
+}
+
+function selectMood(n) {
+  selectedMood = n;
+  document.querySelectorAll('.mood-btn').forEach((b, i) => b.classList.toggle('sel', i + 1 === n));
+}
+
+async function saveReflection() {
+  const notes    = document.getElementById('rf-notes').value.trim() || null;
+  const existing = await apiFetch('GET', `/api/reflections/${date}`);
+  if (existing) {
+    await apiFetch('PUT', `/api/reflections/${date}`, { mood: selectedMood, notes });
+  } else {
+    await apiFetch('POST', '/api/reflections', { date, mood: selectedMood, notes });
+  }
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => btn.textContent = 'Save', 2000);
+}
+
+async function generateSummary() {
+  await saveReflection();
+  const btn = document.getElementById('gen-btn');
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+  btn.disabled = true;
+  try {
+    const r = await apiFetch('POST', `/api/reflections/${date}/summary`);
+    if (r && r.ai_summary) showSummary(r.ai_summary);
+  } catch {
+    alert('Could not generate summary. Make sure ANTHROPIC_API_KEY is set.');
+  }
+  btn.innerHTML = '✦ Generate Summary';
+  btn.disabled = false;
+}
+
+function showSummary(text) {
+  const box = document.getElementById('ai-box');
+  box.textContent = text;
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth' });
+}
+
+loadDay();
+</script>
 {% endblock %}

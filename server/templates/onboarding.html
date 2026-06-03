@@ -1,7 +1,136 @@
 {% extends "base.html" %}
 {% block title %}Welcome — Calmendar{% endblock %}
+
 {% block content %}
-<h1>Welcome to Calmendar</h1>
-<p>Let's get to know you so we can personalize your experience.</p>
-<!-- Onboarding form — to be built out in the web UI phase -->
+<div class="ob-wrap">
+  <div class="ob-card">
+    <h1>Welcome to Calmendar</h1>
+    <p class="ob-subtitle">A few quick questions to personalize your experience.</p>
+
+    <div class="steps-bar">
+      <div class="step-seg"></div>
+      <div class="step-seg"></div>
+      <div class="step-seg"></div>
+    </div>
+
+    <!-- Step 1: Who are you? -->
+    <div class="ob-step active">
+      <div class="fg">
+        <label for="ob-name">Your name</label>
+        <input type="text" id="ob-name" placeholder="e.g. Alex" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="ob-work">What do you do for work?</label>
+        <textarea id="ob-work" placeholder="e.g. I'm a software engineer — I spend most of my day on a computer writing code and attending video calls." rows="3"></textarea>
+      </div>
+    </div>
+
+    <!-- Step 2: Your day -->
+    <div class="ob-step">
+      <div class="fg">
+        <label for="ob-hobbies">What hobbies do you enjoy?</label>
+        <textarea id="ob-hobbies" placeholder="e.g. Hiking, reading, cooking, playing guitar…" rows="3"></textarea>
+      </div>
+      <div class="fg-row">
+        <div class="fg">
+          <label for="ob-wake">Wake time</label>
+          <input type="time" id="ob-wake" value="07:00">
+        </div>
+        <div class="fg">
+          <label for="ob-sleep">Sleep time</label>
+          <input type="time" id="ob-sleep" value="23:00">
+        </div>
+      </div>
+      <div class="fg">
+        <label for="ob-hours">Max work hours per day</label>
+        <input type="number" id="ob-hours" value="8" min="1" max="16">
+      </div>
+    </div>
+
+    <!-- Step 3: Preferences -->
+    <div class="ob-step">
+      <div class="fg">
+        <label>Break style</label>
+        <div class="radio-cards">
+          <label class="radio-card">
+            <input type="radio" name="break_style" value="frequent_short" checked>
+            ☕ Frequent short breaks
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="break_style" value="infrequent_long">
+            🌿 Fewer, longer breaks
+          </label>
+        </div>
+      </div>
+      <div class="fg" style="margin-top:20px">
+        <label>How sensitive are you to stress?</label>
+        <div class="radio-cards">
+          <label class="radio-card">
+            <input type="radio" name="stress" value="low">
+            😌 Low
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="stress" value="medium" checked>
+            😐 Medium
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="stress" value="high">
+            😤 High
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="ob-footer">
+      <button class="btn btn-ghost" id="prev-btn" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" id="next-btn" onclick="nextStep()">Next →</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let step = 0;
+
+function updateSteps() {
+  document.querySelectorAll('.ob-step').forEach((el, i) => el.classList.toggle('active', i === step));
+  document.querySelectorAll('.step-seg').forEach((el, i) => el.classList.toggle('done', i <= step));
+  document.getElementById('prev-btn').style.visibility = step > 0 ? 'visible' : 'hidden';
+  document.getElementById('next-btn').textContent = step === 2 ? 'Get Started →' : 'Next →';
+}
+
+function nextStep() {
+  if (step < 2) { step++; updateSteps(); }
+  else submitOnboarding();
+}
+
+function prevStep() {
+  if (step > 0) { step--; updateSteps(); }
+}
+
+async function submitOnboarding() {
+  const name = document.getElementById('ob-name').value.trim();
+  if (!name) { step = 0; updateSteps(); document.getElementById('ob-name').focus(); return; }
+
+  const body = {
+    name,
+    work_description:   document.getElementById('ob-work').value.trim()  || null,
+    hobbies:            document.getElementById('ob-hobbies').value.trim() || null,
+    wake_time:          document.getElementById('ob-wake').value  || null,
+    sleep_time:         document.getElementById('ob-sleep').value || null,
+    max_daily_hours:    parseInt(document.getElementById('ob-hours').value) || 8,
+    break_style:        document.querySelector('input[name="break_style"]:checked')?.value || 'frequent_short',
+    stress_sensitivity: document.querySelector('input[name="stress"]:checked')?.value || 'medium',
+  };
+
+  const btn = document.getElementById('next-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  await apiFetch('POST', '/api/profile', body);
+  window.location.href = '/';
+}
+
+updateSteps();
+</script>
 {% endblock %}
