@@ -1,2 +1,3 @@
 # Calmendar
 Daily planner that protects your peace of mind
+Final project is going to be an app that serves as a daily planner/calendar, but supports mental well-being. It helps users plan their day in time blocks and warns them when they are overscheduling themselves. Users can log notes and details per task and view an end-of-day reflection. It will also offer personalized suggestions for meaningful breaks when their day is too full, along with other encouraging/helpful notes throughout the day to keep users feeling uplifted. When first opening the web interface there will be some user profile questions to learn which suggestions to give. For my architecture I am using a SQLite backed Flask REST API server, with a Web interface, and CLI.
