@@ -43,13 +43,13 @@
 
 <!-- Breaks management modal -->
 <div class="overlay" id="breaks-modal" onclick="if(event.target===this)closeBreaksModal()">
-  <div class="modal" style="max-width:500px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:500px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <h3 style="margin:0">Breaks</h3>
       <button onclick="closeBreaksModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">×</button>
     </div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:18px">
-      Favorite suggestions you love. Block ones you never want to see. Add your own.
+      Favorite suggestions you love. Block ones you never want to see. Add your own below.
     </p>
 
     <div id="bk-favorites-section">
@@ -62,7 +62,12 @@
       <div class="breaks-list" id="bk-blocked-list"></div>
     </div>
 
-    <div style="margin-top:16px">
+    <div id="bk-custom-section" style="display:none;margin-top:4px">
+      <div class="breaks-section-label">Your suggestions</div>
+      <div class="breaks-list" id="bk-custom-list"></div>
+    </div>
+
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
       <button class="breaks-add-toggle" id="bk-add-toggle" onclick="toggleAddBreakForm()">+ Add your own suggestion</button>
       <div class="breaks-add-fields" id="bk-add-fields">
         <div style="height:14px"></div>
@@ -396,9 +401,10 @@ function closeBreaksModal() {
 }
 
 async function loadBreaksList() {
-  const [favorites, blocked] = await Promise.all([
+  const [favorites, blocked, custom] = await Promise.all([
     apiFetch('GET', '/api/breaks?favorited=1'),
     apiFetch('GET', '/api/breaks/blocked'),
+    apiFetch('GET', '/api/breaks?custom=1'),
   ]);
 
   document.getElementById('bk-fav-list').innerHTML = favorites.length
@@ -411,6 +417,14 @@ async function loadBreaksList() {
     document.getElementById('bk-blocked-list').innerHTML = blocked.map(b => breakItemRow(b)).join('');
   } else {
     blockedSec.style.display = 'none';
+  }
+
+  const customSec = document.getElementById('bk-custom-section');
+  if (custom.length) {
+    customSec.style.display = '';
+    document.getElementById('bk-custom-list').innerHTML = custom.map(b => breakItemRow(b)).join('');
+  } else {
+    customSec.style.display = 'none';
   }
 }
 

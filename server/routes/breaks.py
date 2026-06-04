@@ -12,6 +12,7 @@ def get_breaks():
 
     screen_free = request.args.get('screen_free')
     favorited   = request.args.get('favorited')
+    custom      = request.args.get('custom')
 
     if screen_free is not None:
         query += ' AND is_screen_free = ?'
@@ -19,6 +20,9 @@ def get_breaks():
     if favorited is not None:
         query += ' AND is_favorited = ?'
         params.append(int(favorited))
+    if custom is not None:
+        query += ' AND is_custom = ?'
+        params.append(int(custom))
 
     return jsonify([dict(r) for r in db.execute(query, params).fetchall()])
 
