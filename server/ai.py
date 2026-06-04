@@ -836,11 +836,19 @@ def suggest_break_local(date):
     if dominant and any(w in dominant for w in screen_task_words):
         screen_heavy = True
 
+    # Fetch names the user has blocked so we can skip them
+    blocked_names = {
+        row['name'].lower()
+        for row in db.execute('SELECT name FROM break_activities WHERE is_blocked = 1').fetchall()
+    }
+
     # Date-based seed so suggestions rotate day to day
     day_seed = int(hashlib.md5(date.encode()).hexdigest(), 16)
 
     scored = []
     for act in _ACTIVITY_POOL:
+        if act['name'].lower() in blocked_names:
+            continue
         score = 0.0
 
         # Hobby keyword match

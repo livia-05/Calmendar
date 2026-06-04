@@ -11,6 +11,7 @@
   </div>
   <div class="nav-actions">
     <button class="btn btn-primary" onclick="openModal()">+ Task</button>
+    <button class="btn btn-ghost" onclick="openBreaksModal()">Breaks</button>
     <a href="/reflect" class="btn btn-ghost">Reflect</a>
   </div>
 </nav>
@@ -39,6 +40,54 @@
         </div>
       </div>
       <div class="suggestion-card" id="suggestion-card"></div>
+
+<!-- Breaks management modal -->
+<div class="overlay" id="breaks-modal" onclick="if(event.target===this)closeBreaksModal()">
+  <div class="modal" style="max-width:520px">
+    <h3>Break Suggestions</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
+      Heart activities you love, block ones you never want suggested.
+    </p>
+
+    <div class="breaks-section-label">Your activities</div>
+    <div class="breaks-list" id="bk-list"></div>
+
+    <div id="bk-blocked-section" style="display:none">
+      <div class="breaks-section-label">Blocked</div>
+      <div class="breaks-list" id="bk-blocked-list"></div>
+    </div>
+
+    <div class="breaks-add-form">
+      <button class="breaks-add-toggle" onclick="toggleAddBreakForm()">+ Add your own suggestion</button>
+      <div class="breaks-add-fields" id="bk-add-fields">
+        <div style="height:12px"></div>
+        <div class="fg">
+          <label>Name</label>
+          <input type="text" id="bk-name" placeholder="e.g. Play with my cat" autocomplete="off">
+        </div>
+        <div class="fg">
+          <label>Description <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input type="text" id="bk-desc" placeholder="What does this look like?">
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Duration (minutes)</label>
+            <input type="number" id="bk-dur" placeholder="10" min="1" max="120">
+          </div>
+          <div class="fg">
+            <label>Category</label>
+            <input type="text" id="bk-cat" placeholder="creative, social…">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <input type="checkbox" id="bk-sf" checked style="width:auto">
+          <label for="bk-sf" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--text)">Screen-free</label>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="submitCustomBreak()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
 
       <div class="task-panel-header">
         <div>
@@ -269,6 +318,8 @@ function _warningsFallback(tasks) {
 }
 
 // ── Break suggestion ──
+let _currentSug = null;
+
 async function getSuggestion() {
   const card = document.getElementById('suggestion-card');
   card.innerHTML = '<span class="spinner"></span> Finding the right break for you…';
@@ -280,15 +331,133 @@ async function getSuggestion() {
       card.innerHTML = `<span style="color:var(--muted)">${s?.error || 'Could not get a suggestion right now.'}</span>`;
       return;
     }
-    card.innerHTML = `
-      <button class="sug-dismiss" onclick="document.getElementById('suggestion-card').classList.remove('visible')">×</button>
-      <div class="sug-name">${escHtml(s.name)} · ${s.duration_minutes} min</div>
-      <div class="sug-desc">${escHtml(s.description)}</div>
-      <div class="sug-reason">${escHtml(s.reason)}</div>
-    `;
+    _currentSug = s;
+    renderSuggestionCard(s, false, false);
   } catch {
     card.innerHTML = `<span style="color:var(--muted)">Could not get a suggestion right now.</span>`;
   }
+}
+
+function renderSuggestionCard(s, isFav, isBlocked) {
+  const card = document.getElementById('suggestion-card');
+  card.innerHTML = `
+    <button class="sug-dismiss" onclick="document.getElementById('suggestion-card').classList.remove('visible')">×</button>
+    <div class="sug-name">${escHtml(s.name)} · ${s.duration_minutes} min</div>
+    <div class="sug-desc">${escHtml(s.description)}</div>
+    <div class="sug-reason">${escHtml(s.reason)}</div>
+    <div class="sug-actions">
+      <button class="sug-btn sug-fav ${isFav ? 'active-fav' : ''}" onclick="sugAction('favorite')">
+        ${isFav ? '♥ Favorited' : '♥ Favorite'}
+      </button>
+      <button class="sug-btn sug-block ${isBlocked ? 'active-block' : ''}" onclick="sugAction('block')">
+        ${isBlocked ? '✕ Blocked' : '✕ Not for me'}
+      </button>
+    </div>
+  `;
+}
+
+async function sugAction(action) {
+  if (!_currentSug) return;
+  const result = await apiFetch('POST', '/api/breaks/action-by-name', {
+    name:             _currentSug.name,
+    description:      _currentSug.description,
+    duration_minutes: _currentSug.duration_minutes,
+    action,
+  });
+  const isFav     = result.is_favorited === 1;
+  const isBlocked = result.is_blocked   === 1;
+  renderSuggestionCard(_currentSug, isFav, isBlocked);
+  if (isBlocked) {
+    // Dismiss after a moment so the user sees the confirmation
+    setTimeout(() => document.getElementById('suggestion-card').classList.remove('visible'), 1200);
+  }
+}
+
+// ── Breaks modal ──
+async function openBreaksModal() {
+  document.getElementById('breaks-modal').classList.add('open');
+  await loadBreaksList();
+}
+
+function closeBreaksModal() {
+  document.getElementById('breaks-modal').classList.remove('open');
+}
+
+async function loadBreaksList() {
+  const [active, blocked] = await Promise.all([
+    apiFetch('GET', '/api/breaks'),
+    apiFetch('GET', '/api/breaks/blocked'),
+  ]);
+
+  document.getElementById('bk-list').innerHTML = active.length
+    ? active.map(b => breakItemRow(b)).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:8px 0">No activities yet.</div>';
+
+  const blockedSec = document.getElementById('bk-blocked-section');
+  if (blocked.length) {
+    blockedSec.style.display = '';
+    document.getElementById('bk-blocked-list').innerHTML = blocked.map(b => breakItemRow(b)).join('');
+  } else {
+    blockedSec.style.display = 'none';
+  }
+}
+
+function breakItemRow(b) {
+  const dur     = b.duration_minutes ? `${b.duration_minutes} min · ` : '';
+  const sf      = b.is_screen_free ? 'screen-free' : 'screen';
+  const custom  = b.is_custom ? ' · custom' : '';
+  const favCls  = b.is_favorited ? 'bk-btn fav-on'   : 'bk-btn';
+  const blkCls  = b.is_blocked  ? 'bk-btn block-on'  : 'bk-btn';
+  const delBtn  = b.is_custom
+    ? `<button class="${'bk-btn'}" onclick="deleteBreak(${b.id})" style="color:var(--red);border-color:var(--red)" title="Delete">✕</button>`
+    : '';
+  return `<div class="break-item" id="bkrow-${b.id}">
+    <div style="flex:1;min-width:0">
+      <div class="break-item-name">${escHtml(b.name)}</div>
+      <div class="break-item-meta">${dur}${sf}${custom}</div>
+    </div>
+    <div class="break-item-actions">
+      <button class="${favCls}" onclick="toggleBreakFav(${b.id})" title="${b.is_favorited ? 'Unfavorite' : 'Favorite'}">♥</button>
+      <button class="${blkCls}" onclick="toggleBreakBlock(${b.id})" title="${b.is_blocked ? 'Unblock' : 'Block'}">🚫</button>
+      ${delBtn}
+    </div>
+  </div>`;
+}
+
+async function toggleBreakFav(id) {
+  await apiFetch('PUT', `/api/breaks/${id}/favorite`);
+  await loadBreaksList();
+}
+
+async function toggleBreakBlock(id) {
+  await apiFetch('PUT', `/api/breaks/${id}/block`);
+  await loadBreaksList();
+}
+
+async function deleteBreak(id) {
+  if (!confirm('Delete this custom activity?')) return;
+  await apiFetch('DELETE', `/api/breaks/${id}`);
+  await loadBreaksList();
+}
+
+function toggleAddBreakForm() {
+  document.getElementById('bk-add-fields').classList.toggle('open');
+}
+
+async function submitCustomBreak() {
+  const name = document.getElementById('bk-name').value.trim();
+  if (!name) { alert('Name is required.'); return; }
+  await apiFetch('POST', '/api/breaks', {
+    name,
+    description:      document.getElementById('bk-desc').value.trim() || null,
+    duration_minutes: parseInt(document.getElementById('bk-dur').value) || null,
+    category:         document.getElementById('bk-cat').value.trim() || null,
+    is_screen_free:   document.getElementById('bk-sf').checked ? 1 : 0,
+  });
+  ['bk-name','bk-desc','bk-dur','bk-cat'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bk-sf').checked = true;
+  document.getElementById('bk-add-fields').classList.remove('open');
+  await loadBreaksList();
 }
 
 // ── Modal ──

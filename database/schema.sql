@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS break_activities (
     is_screen_free   INTEGER DEFAULT 1,
     is_custom        INTEGER DEFAULT 0,
     is_favorited     INTEGER DEFAULT 0,
+    is_blocked       INTEGER DEFAULT 0,
     created_at       TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
