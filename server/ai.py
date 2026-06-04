@@ -800,9 +800,9 @@ _SCREEN_WORK_WORDS = {
 }
 
 
-def suggest_break_local(date):
+def suggest_break_local(date, exclude=None):
     """Rule-based break suggestion using profile + today's tasks + recent task history.
-    No API key required."""
+    No API key required. exclude is an optional list of activity names to skip."""
     db = get_db()
     profile = db.execute('SELECT * FROM user_profile ORDER BY id LIMIT 1').fetchone()
     today_tasks = db.execute(
@@ -842,12 +842,17 @@ def suggest_break_local(date):
         for row in db.execute('SELECT name FROM break_activities WHERE is_blocked = 1').fetchall()
     }
 
+    # Names already shown this session — skip them so each press gives a new idea
+    exclude_names = {n.lower() for n in (exclude or [])}
+
     # Date-based seed so suggestions rotate day to day
     day_seed = int(hashlib.md5(date.encode()).hexdigest(), 16)
 
     scored = []
     for act in _ACTIVITY_POOL:
         if act['name'].lower() in blocked_names:
+            continue
+        if act['name'].lower() in exclude_names:
             continue
         score = 0.0
 
@@ -872,6 +877,11 @@ def suggest_break_local(date):
         scored.append((score, act))
 
     scored.sort(key=lambda x: x[0], reverse=True)
+
+    # If every activity was excluded (user clicked through them all), ignore exclusions
+    if not scored:
+        scored = [(0, act) for act in _ACTIVITY_POOL if act['name'].lower() not in blocked_names]
+        scored.sort(key=lambda x: x[0], reverse=True)
 
     # Pick from the top 10 scorers, rotating daily so the same activity
     # doesn't win every day even when it has the highest hobby match.
@@ -1000,7 +1010,7 @@ High-priority or cognitively heavy tasks should lower the threshold. Be warm and
     return result
 
 
-def suggest_break(date):
+def suggest_break(date, exclude=None):
     """Read today's tasks + profile from DB and ask Claude for a specific, personalized
     break activity suggestion. Returns a dict with name, description, duration_minutes, reason."""
     db = get_db()
@@ -1023,6 +1033,7 @@ def suggest_break(date):
     else:
         profile_ctx = 'No profile'
 
+    already_shown = ', '.join(exclude) if exclude else 'none'
     prompt = f"""You are a mindful well-being assistant for Calmendar.
 
 User profile:
@@ -1031,7 +1042,10 @@ User profile:
 Today's schedule:
 {_format_tasks(tasks)}
 
+Already suggested this session (do not repeat these): {already_shown}
+
 Suggest one specific break activity tailored to this person's hobbies and what they've been doing today.
+Make it different from anything already suggested above.
 Respond with ONLY a JSON object — no markdown:
 {{
   "name": "short activity name",

@@ -20,8 +20,9 @@ def break_suggestion():
     data = request.get_json()
     if not data or not data.get('date'):
         return jsonify({'error': 'date is required'}), 400
+    exclude = data.get('exclude', [])
     try:
-        return jsonify(suggest_break(data['date']))
+        return jsonify(suggest_break(data['date'], exclude=exclude))
     except Exception:
         # Fall back to rule-based local suggestion (no API key needed)
-        return jsonify(suggest_break_local(data['date']))
+        return jsonify(suggest_break_local(data['date'], exclude=exclude))

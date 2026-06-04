@@ -11,8 +11,8 @@
   </div>
   <div class="nav-actions">
     <button class="btn btn-primary" onclick="openModal()">+ Task</button>
-    <button class="btn btn-ghost" onclick="openBreaksModal()">Breaks</button>
     <a href="/reflect" class="btn btn-ghost">Reflect</a>
+    <button class="btn btn-ghost" onclick="openBreaksModal()">Breaks</button>
   </div>
 </nav>
 
@@ -43,24 +43,29 @@
 
 <!-- Breaks management modal -->
 <div class="overlay" id="breaks-modal" onclick="if(event.target===this)closeBreaksModal()">
-  <div class="modal" style="max-width:520px">
-    <h3>Break Suggestions</h3>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
-      Heart activities you love, block ones you never want suggested.
+  <div class="modal" style="max-width:500px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="margin:0">Breaks</h3>
+      <button onclick="closeBreaksModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:18px">
+      Favorite suggestions you love. Block ones you never want to see. Add your own.
     </p>
 
-    <div class="breaks-section-label">Your activities</div>
-    <div class="breaks-list" id="bk-list"></div>
+    <div id="bk-favorites-section">
+      <div class="breaks-section-label">Favorites</div>
+      <div class="breaks-list" id="bk-fav-list"></div>
+    </div>
 
-    <div id="bk-blocked-section" style="display:none">
+    <div id="bk-blocked-section" style="display:none;margin-top:4px">
       <div class="breaks-section-label">Blocked</div>
       <div class="breaks-list" id="bk-blocked-list"></div>
     </div>
 
-    <div class="breaks-add-form">
-      <button class="breaks-add-toggle" onclick="toggleAddBreakForm()">+ Add your own suggestion</button>
+    <div style="margin-top:16px">
+      <button class="breaks-add-toggle" id="bk-add-toggle" onclick="toggleAddBreakForm()">+ Add your own suggestion</button>
       <div class="breaks-add-fields" id="bk-add-fields">
-        <div style="height:12px"></div>
+        <div style="height:14px"></div>
         <div class="fg">
           <label>Name</label>
           <input type="text" id="bk-name" placeholder="e.g. Play with my cat" autocomplete="off">
@@ -318,7 +323,8 @@ function _warningsFallback(tasks) {
 }
 
 // ── Break suggestion ──
-let _currentSug = null;
+let _currentSug  = null;
+let _sugHistory  = [];   // names shown this session — sent as exclude so we don't repeat
 
 async function getSuggestion() {
   const card = document.getElementById('suggestion-card');
@@ -326,12 +332,18 @@ async function getSuggestion() {
   card.classList.add('visible');
 
   try {
-    const s = await apiFetch('POST', '/api/ai/break-suggestion', { date: currentDate });
+    const s = await apiFetch('POST', '/api/ai/break-suggestion', {
+      date:    currentDate,
+      exclude: _sugHistory,
+    });
     if (!s || s.error) {
       card.innerHTML = `<span style="color:var(--muted)">${s?.error || 'Could not get a suggestion right now.'}</span>`;
       return;
     }
     _currentSug = s;
+    // Track this suggestion so next press gives something different
+    _sugHistory.push(s.name);
+    if (_sugHistory.length > 12) _sugHistory.shift(); // keep last 12, then cycle
     renderSuggestionCard(s, false, false);
   } catch {
     card.innerHTML = `<span style="color:var(--muted)">Could not get a suggestion right now.</span>`;
@@ -384,14 +396,14 @@ function closeBreaksModal() {
 }
 
 async function loadBreaksList() {
-  const [active, blocked] = await Promise.all([
-    apiFetch('GET', '/api/breaks'),
+  const [favorites, blocked] = await Promise.all([
+    apiFetch('GET', '/api/breaks?favorited=1'),
     apiFetch('GET', '/api/breaks/blocked'),
   ]);
 
-  document.getElementById('bk-list').innerHTML = active.length
-    ? active.map(b => breakItemRow(b)).join('')
-    : '<div style="color:var(--muted);font-size:13px;padding:8px 0">No activities yet.</div>';
+  document.getElementById('bk-fav-list').innerHTML = favorites.length
+    ? favorites.map(b => breakItemRow(b)).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:6px 0 10px">No favorites yet — heart a suggestion when it pops up.</div>';
 
   const blockedSec = document.getElementById('bk-blocked-section');
   if (blocked.length) {
@@ -441,7 +453,10 @@ async function deleteBreak(id) {
 }
 
 function toggleAddBreakForm() {
-  document.getElementById('bk-add-fields').classList.toggle('open');
+  const fields = document.getElementById('bk-add-fields');
+  const toggle = document.getElementById('bk-add-toggle');
+  const open   = fields.classList.toggle('open');
+  toggle.textContent = open ? '− Add your own suggestion' : '+ Add your own suggestion';
 }
 
 async function submitCustomBreak() {
@@ -457,6 +472,7 @@ async function submitCustomBreak() {
   ['bk-name','bk-desc','bk-dur','bk-cat'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('bk-sf').checked = true;
   document.getElementById('bk-add-fields').classList.remove('open');
+  document.getElementById('bk-add-toggle').textContent = '+ Add your own suggestion';
   await loadBreaksList();
 }
 
