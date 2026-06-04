@@ -848,33 +848,48 @@ def suggest_break_local(date, exclude=None):
     # Date-based seed so suggestions rotate day to day
     day_seed = int(hashlib.md5(date.encode()).hexdigest(), 16)
 
-    scored = []
-    for act in _ACTIVITY_POOL:
-        if act['name'].lower() in blocked_names:
-            continue
-        if act['name'].lower() in exclude_names:
-            continue
+    def _score_pool_act(act):
+        if act['name'].lower() in blocked_names or act['name'].lower() in exclude_names:
+            return None
         score = 0.0
-
-        # Hobby keyword match
         for kw in act['hobby_keywords']:
             if kw in hobbies:
                 score += 5
-
-        # Boost screen-free activities for screen-heavy workers/days
         if screen_heavy and 'screen_free' in act['tags']:
             score += 3
-        # Penalise screen entertainment for screen-heavy days
         if screen_heavy and 'screen' in act['tags'] and 'screen_free' not in act['tags']:
             score -= 3
-
-        # Boost physical/outdoor if today is packed with desk-style tasks
         if screen_heavy and 'physical' in act['tags']:
             score += 2
         if screen_heavy and 'outdoor' in act['tags']:
             score += 1
+        return score
 
-        scored.append((score, act))
+    scored = []
+    for act in _ACTIVITY_POOL:
+        s = _score_pool_act(act)
+        if s is not None:
+            scored.append((s, act))
+
+    # Pull user-added custom activities from the DB and add them to the pool.
+    # Give them a high base score (8) so they appear reliably among the top candidates.
+    custom_rows = db.execute(
+        'SELECT * FROM break_activities WHERE is_custom = 1 AND is_blocked = 0'
+    ).fetchall()
+    for row in custom_rows:
+        if row['name'].lower() in exclude_names:
+            continue
+        dur = row['duration_minutes'] or (10 if break_style == 'frequent_short' else 20)
+        custom_act = {
+            'name':           row['name'],
+            'description':    row['description'] or f'Take a break: {row["name"]}.',
+            'short_mins':     dur,
+            'long_mins':      dur,
+            'hobby_keywords': [],
+            'tags':           ['screen_free'] if row['is_screen_free'] else [],
+            'reason':         'You added this as a personal break — a great time to enjoy it.',
+        }
+        scored.append((8.0, custom_act))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
@@ -892,9 +907,9 @@ def suggest_break_local(date, exclude=None):
 
     # Personalise the reason with today's context when possible
     reason = best['reason']
-    if dominant and screen_heavy and 'screen_free' in best['tags']:
+    if dominant and screen_heavy and 'screen_free' in best.get('tags', []):
         reason = f"After a day of {dominant} work, stepping away from your screen will help you recharge. {reason}"
-    elif dominant:
+    elif dominant and reason != 'You added this as a personal break — a great time to enjoy it.':
         reason = f"With a day focused on {dominant}, {reason[0].lower()}{reason[1:]}"
 
     return {
@@ -1033,11 +1048,26 @@ def suggest_break(date, exclude=None):
     else:
         profile_ctx = 'No profile'
 
+    # Include any custom activities the user added so Claude can suggest them
+    custom_rows = db.execute(
+        'SELECT name, description, duration_minutes FROM break_activities WHERE is_custom = 1 AND is_blocked = 0'
+    ).fetchall()
+    if custom_rows:
+        custom_list = '\n'.join(
+            f"- {r['name']}" + (f" ({r['duration_minutes']} min)" if r['duration_minutes'] else '')
+            + (f": {r['description']}" if r['description'] else '')
+            for r in custom_rows
+        )
+        custom_ctx = f"\nUser's personal break activities (feel free to suggest one of these):\n{custom_list}"
+    else:
+        custom_ctx = ''
+
     already_shown = ', '.join(exclude) if exclude else 'none'
     prompt = f"""You are a mindful well-being assistant for Calmendar.
 
 User profile:
 {profile_ctx}
+{custom_ctx}
 
 Today's schedule:
 {_format_tasks(tasks)}
@@ -1045,7 +1075,7 @@ Today's schedule:
 Already suggested this session (do not repeat these): {already_shown}
 
 Suggest one specific break activity tailored to this person's hobbies and what they've been doing today.
-Make it different from anything already suggested above.
+If one of their personal break activities fits well, prefer that. Make it different from anything already suggested above.
 Respond with ONLY a JSON object — no markdown:
 {{
   "name": "short activity name",
