@@ -79,8 +79,9 @@ Stores the library of break activities shown to the user. The table is pre-popul
 | `category` | `TEXT` | `NULL` | Category label, e.g. `physical`, `mindfulness`, `creative`, `social`, `rest` |
 | `duration_minutes` | `INTEGER` | `NULL` | Suggested duration in minutes |
 | `is_screen_free` | `INTEGER` | `1` | `1` if the activity does not require a screen, `0` if it does. Stored as an integer boolean. |
-| `is_custom` | `INTEGER` | `0` | `0` for built-in defaults, `1` for user-created activities. Custom activities can be deleted; built-ins cannot. |
+| `is_custom` | `INTEGER` | `0` | `0` for built-in defaults, `1` for user-created activities. Only custom activities can be deleted via the API. |
 | `is_favorited` | `INTEGER` | `0` | `1` if the user has favorited this activity, `0` otherwise. Toggled via `PUT /api/breaks/<id>/favorite`. |
+| `is_blocked` | `INTEGER` | `0` | `1` if the user has blocked this activity. Blocked activities are excluded from `GET /api/breaks` and never suggested. Toggled via `PUT /api/breaks/<id>/block`. Added via migration on first startup if the column does not exist. |
 | `created_at` | `TEXT` | `CURRENT_TIMESTAMP` | ISO 8601 timestamp of when the activity was added |
 
 ### Built-in defaults

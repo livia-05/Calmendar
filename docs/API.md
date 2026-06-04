@@ -165,14 +165,15 @@ Updates the existing profile. Send only the fields you want to change. Accepts t
 
 ### `GET /api/breaks`
 
-Returns all break activities. Filter with query parameters.
+Returns all non-blocked break activities. Filter with query parameters.
 
 **Query parameters**
 
 | Parameter | Type | Description |
 |---|---|---|
 | `screen_free` | `0` or `1` | Filter to only screen-free (or screen) activities |
-| `favorited` | `0` or `1` | Filter to only favorited (or unfavorited) activities |
+| `favorited` | `0` or `1` | Filter to only favorited activities |
+| `custom` | `0` or `1` | Filter to only user-added (`1`) or built-in (`0`) activities |
 
 **Response** — `200 OK`
 ```json
@@ -186,10 +187,19 @@ Returns all break activities. Filter with query parameters.
     "is_screen_free": 1,
     "is_custom": 0,
     "is_favorited": 0,
+    "is_blocked": 0,
     "created_at": "2026-06-01T10:00:00"
   }
 ]
 ```
+
+---
+
+### `GET /api/breaks/blocked`
+
+Returns all blocked break activities.
+
+**Response** — `200 OK` — array of break activity objects with `is_blocked: 1`.
 
 ---
 
@@ -215,7 +225,7 @@ Creates a custom break activity. The new activity is always marked `is_custom: 1
 
 ### `PUT /api/breaks/<id>/favorite`
 
-Toggles the `is_favorited` flag on a break activity. If it was favorited, it becomes unfavorited, and vice versa.
+Toggles the `is_favorited` flag on a break activity. Works on any activity, built-in or custom.
 
 **Response** — `200 OK` — the updated break activity object.
 
@@ -223,13 +233,44 @@ Toggles the `is_favorited` flag on a break activity. If it was favorited, it bec
 
 ---
 
+### `PUT /api/breaks/<id>/block`
+
+Toggles the `is_blocked` flag on a break activity. Works on any activity, built-in or custom. Blocking also clears the favorite flag. Blocked activities are excluded from `GET /api/breaks` and from all suggestions.
+
+**Response** — `200 OK` — the updated break activity object.
+
+**Error** — `404` if the activity is not found.
+
+---
+
+### `POST /api/breaks/action-by-name`
+
+Finds or creates a break activity by name and applies a favorite or block action. Used by the suggestion card, which may display AI-generated activities that are not yet stored in the database.
+
+**Request body**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Activity name (case-insensitive match) |
+| `action` | string | yes | `favorite` or `block` |
+| `description` | string | no | Description to store if the activity is new |
+| `duration_minutes` | integer | no | Duration to store if the activity is new |
+
+If no activity with that name exists, one is created before the action is applied. Favoriting clears the blocked flag; blocking clears the favorited flag.
+
+**Response** — `200 OK` — the activity object after the action is applied.
+
+**Error** — `400` if `name` or `action` is missing or invalid.
+
+---
+
 ### `DELETE /api/breaks/<id>`
 
-Deletes a custom break activity. Built-in (non-custom) activities cannot be deleted.
+Deletes a custom break activity. Built-in activities cannot be deleted — use `PUT /api/breaks/<id>/block` to hide them from suggestions instead.
 
 **Response** — `204 No Content`
 
-**Errors** — `403` if the activity is a built-in default; `404` if not found.
+**Errors** — `403` if the activity is built-in; `404` if not found.
 
 ---
 
@@ -344,13 +385,14 @@ If `overscheduled` is `false`, `overscheduled_message` will be `null`. If `needs
 
 ### `POST /api/ai/break-suggestion`
 
-Returns a personalized break suggestion for the given date. Uses the user's hobbies, work type, and today's tasks to pick something relevant. If the AI is unavailable, falls back to a rule-based suggestion from a local pool of 96 activities.
+Returns a personalized break suggestion for the given date. Uses the user's hobbies, work type, today's tasks, and any user-added custom activities to pick something relevant. If the AI is unavailable, falls back to a rule-based suggestion from a local pool of 96 activities plus the user's custom activities. Blocked activities are never suggested.
 
 **Request body**
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `date` | `YYYY-MM-DD` | yes | The date to generate a suggestion for |
+| `exclude` | array of strings | no | Activity names already shown this session. Both the local pool and the Claude prompt skip these so each press returns a different suggestion. |
 
 **Response** — `200 OK`
 ```json
