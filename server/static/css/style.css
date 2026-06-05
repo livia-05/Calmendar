@@ -373,3 +373,173 @@ textarea { resize: vertical; min-height: 68px; }
   vertical-align: middle; margin-right: 6px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Wellness page ─────────────────────────────────────────────────────────── */
+.wl-wrap   { max-width: 680px; margin: 40px auto; padding: 0 24px 80px; }
+.wl-header { margin-bottom: 32px; }
+.wl-title  { font-size: 22px; font-weight: 600; }
+.wl-sub    { color: var(--muted); font-size: 13px; margin-top: 5px; }
+
+.wl-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+.wl-card {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 20px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r);
+  cursor: pointer; transition: border-color 0.18s, background 0.18s;
+}
+.wl-card:hover { border-color: rgba(92,200,204,0.4); background: var(--surface-2); }
+.wl-icon      { font-size: 26px; flex-shrink: 0; margin-top: 1px; }
+.wl-card-name { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+.wl-card-desc { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+/* Wellness modals */
+.wl-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 28px; width: 100%; max-width: 480px;
+  box-shadow: var(--shadow); animation: slideUp 0.2s ease;
+  max-height: 88vh; overflow-y: auto;
+}
+.wl-modal-wide { max-width: 600px; }
+
+.wl-modal-hd {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 20px;
+}
+.wl-modal-hd h3   { font-size: 16px; font-weight: 600; }
+.wl-modal-sub     { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.wl-x {
+  background: none; border: none; color: var(--muted);
+  font-size: 22px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0;
+}
+.wl-x:hover { color: var(--text); }
+
+.wl-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.wl-tab {
+  padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-size: 12px;
+  font-family: inherit; cursor: pointer; transition: all 0.15s;
+}
+.wl-tab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+.wl-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+.wl-done     { text-align: center; padding: 36px 0; }
+.wl-done-ico { font-size: 44px; margin-bottom: 12px; }
+.wl-done-msg { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+
+/* Meditation */
+.med-tip {
+  font-size: 12px; color: var(--muted); line-height: 1.65;
+  font-style: italic; margin-bottom: 20px;
+}
+.breath-stage {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 20px 0 8px; gap: 14px;
+}
+.breath-ring {
+  width: 148px; height: 148px; border-radius: 50%;
+  border: 3px solid var(--accent);
+  background: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+  transform: scale(0.7);
+  box-shadow: 0 0 20px rgba(92,200,204,0.12);
+}
+.breath-txt       { font-size: 22px; font-weight: 600; color: var(--accent); }
+.breath-phase-lbl { font-size: 14px; font-weight: 500; color: var(--text); min-height: 20px; }
+.med-cycles-lbl   { font-size: 12px; color: var(--muted); text-align: center; min-height: 18px; margin-top: 4px; }
+
+/* Workout */
+.routine-list { max-height: 280px; overflow-y: auto; margin-bottom: 4px; }
+.ex-prog-bar  { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 18px; }
+.ex-prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s; }
+.ex-step-lbl  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+.ex-name      { font-size: 20px; font-weight: 600; margin-bottom: 5px; }
+.ex-detail    { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 22px; }
+
+.ex-timer-ring {
+  position: relative; width: 120px; height: 120px; margin: 0 auto 12px;
+}
+.ex-svg         { width: 100%; height: 100%; }
+.ex-svg-bg      { fill: none; stroke: var(--border); stroke-width: 7; }
+.ex-svg-arc     {
+  fill: none; stroke: var(--accent); stroke-width: 7; stroke-linecap: round;
+  transform: rotate(-90deg); transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.85s linear;
+}
+.ex-timer-num {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 28px; font-weight: 600; color: var(--accent);
+}
+
+.ex-preview-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+.ex-preview-row:last-child { border-bottom: none; }
+.ex-num {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 11px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.ex-prev-name   { font-size: 13px; font-weight: 500; }
+.ex-prev-detail { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* Sounds */
+.sounds-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.sound-card {
+  padding: 14px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--r);
+}
+.sound-ico    { font-size: 20px; }
+.sound-name   { font-size: 13px; font-weight: 600; margin: 6px 0 5px; }
+.sound-desc   { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 8px; }
+.sound-search { font-size: 11px; color: var(--accent); font-style: italic; }
+
+/* Gratitude journal */
+.grat-prompt {
+  font-size: 14px; font-weight: 500; color: var(--lav);
+  margin-bottom: 18px; line-height: 1.55;
+}
+.grat-inputs { display: flex; flex-direction: column; gap: 10px; }
+.grat-in {
+  width: 100%; padding: 10px 13px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text);
+  font-family: inherit; font-size: 13px; outline: none;
+  transition: border-color 0.15s;
+}
+.grat-in:focus { border-color: var(--lav); }
+
+.grat-past-bar {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+.grat-past-btn {
+  background: none; border: 1px dashed var(--border); border-radius: var(--r-sm);
+  color: var(--muted); font-size: 12px; padding: 7px 14px; width: 100%;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.grat-past-btn:hover { border-color: var(--lav); color: var(--lav); }
+
+.grat-date-pills {
+  display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 10px;
+}
+.grat-date-pill {
+  padding: 5px 13px; border-radius: 20px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-size: 12px;
+  font-family: inherit; cursor: pointer; transition: all 0.15s;
+}
+.grat-date-pill:hover  { border-color: var(--lav); color: var(--lav); }
+.grat-date-pill.active { background: rgba(168,159,212,0.12); border-color: var(--lav); color: var(--lav); }
+.grat-no-past  { font-size: 12px; color: var(--muted); padding: 10px 0; }
+
+.grat-saved     { margin-top: 12px; }
+.grat-saved-lbl {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.7px; color: var(--muted); margin-bottom: 6px;
+}
+.grat-item { font-size: 13px; color: var(--text); line-height: 1.75; }

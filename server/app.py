@@ -42,6 +42,10 @@ def create_app(test_config=None):
     def reflect():
         return render_template('reflect.html', today=_date.today().isoformat())
 
+    @app.route('/wellness')
+    def wellness():
+        return render_template('wellness.html')
+
     return app
 
 

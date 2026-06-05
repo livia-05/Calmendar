@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% block title %}Wellness · Calmendar{% endblock %}
+
+{% block content %}
+<nav class="nav">
+  <a href="/" class="nav-brand" style="text-decoration:none">Calmendar</a>
+  <span style="font-size:15px;font-weight:600;color:var(--text)">Wellness</span>
+  <div class="nav-actions">
+    <a href="/" class="btn btn-ghost">← Home</a>
+  </div>
+</nav>
+
+<div class="wl-wrap">
+  <div class="wl-header">
+    <h1 class="wl-title">Your Wellbeing</h1>
+    <p class="wl-sub">Tools to support your mental and physical health throughout the day.</p>
+  </div>
+
+  <div class="wl-grid">
+    <div class="wl-card" onclick="openModule('meditation')">
+      <div class="wl-icon">🧘</div>
+      <div>
+        <div class="wl-card-name">Meditation Guide</div>
+        <div class="wl-card-desc">Guided breathing techniques to calm your nervous system and reduce stress between tasks.</div>
+      </div>
+    </div>
+
+    <div class="wl-card" onclick="openModule('workout')">
+      <div class="wl-icon">⚡</div>
+      <div>
+        <div class="wl-card-name">Movement Routines</div>
+        <div class="wl-card-desc">Quick routines from gentle desk stretches to energizing full-body workouts.</div>
+      </div>
+    </div>
+
+    <div class="wl-card" onclick="openModule('sounds')">
+      <div class="wl-icon">🎵</div>
+      <div>
+        <div class="wl-card-name">Soothing Sounds</div>
+        <div class="wl-card-desc">A curated guide to ambient soundscapes and music for focus, calm, and sleep.</div>
+      </div>
+    </div>
+
+    <div class="wl-card" onclick="openModule('gratitude')">
+      <div class="wl-icon">🌱</div>
+      <div>
+        <div class="wl-card-name">Gratitude Journal</div>
+        <div class="wl-card-desc">Write three things you're grateful for each day. Small reflections, lasting shifts.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MEDITATION MODAL ── -->
+<div class="overlay" id="mod-meditation" onclick="if(event.target===this)closeModule('meditation')">
+  <div class="wl-modal">
+    <div class="wl-modal-hd">
+      <div>
+        <h3>🧘 Meditation Guide</h3>
+        <p class="wl-modal-sub">Select a technique and breathe</p>
+      </div>
+      <button class="wl-x" onclick="closeModule('meditation')">×</button>
+    </div>
+
+    <div class="wl-tabs" id="med-tabs">
+      <button class="wl-tab active" onclick="selectTech(0)">Box Breathing</button>
+      <button class="wl-tab"        onclick="selectTech(1)">4-7-8</button>
+      <button class="wl-tab"        onclick="selectTech(2)">Deep Belly</button>
+    </div>
+
+    <p class="med-tip" id="med-tip"></p>
+
+    <div class="breath-stage">
+      <div class="breath-ring" id="breath-ring">
+        <span class="breath-txt" id="breath-txt">Press Begin</span>
+      </div>
+      <div class="breath-phase-lbl" id="breath-phase-lbl"></div>
+    </div>
+
+    <div class="med-cycles-lbl" id="med-cycles-lbl"></div>
+
+    <div class="wl-foot">
+      <button class="btn btn-ghost"   id="med-stop-btn"  onclick="stopBreath()" style="display:none">Stop</button>
+      <button class="btn btn-primary" id="med-start-btn" onclick="startBreath()">Begin</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── WORKOUT MODAL ── -->
+<div class="overlay" id="mod-workout" onclick="if(event.target===this)closeModule('workout')">
+  <div class="wl-modal">
+    <div class="wl-modal-hd">
+      <div>
+        <h3>⚡ Movement Routines</h3>
+        <p class="wl-modal-sub">Choose your intensity</p>
+      </div>
+      <button class="wl-x" onclick="closeModule('workout')">×</button>
+    </div>
+
+    <!-- Idle: routine picker -->
+    <div id="wk-idle">
+      <div class="wl-tabs" id="wk-tabs">
+        <button class="wl-tab active" onclick="selectRoutine(0)">Gentle · 5 min</button>
+        <button class="wl-tab"        onclick="selectRoutine(1)">Energize · 10 min</button>
+        <button class="wl-tab"        onclick="selectRoutine(2)">Power · 15 min</button>
+      </div>
+      <div id="routine-list" class="routine-list"></div>
+      <div class="wl-foot">
+        <button class="btn btn-primary" onclick="startWk()">Start Routine</button>
+      </div>
+    </div>
+
+    <!-- Active: exercise step -->
+    <div id="wk-active" style="display:none">
+      <div class="ex-prog-bar"><div class="ex-prog-fill" id="ex-prog-fill"></div></div>
+      <div class="ex-step-lbl" id="ex-step-lbl"></div>
+      <div class="ex-name"     id="ex-name"></div>
+      <div class="ex-detail"   id="ex-detail"></div>
+      <div class="ex-timer-ring">
+        <svg viewBox="0 0 100 100" class="ex-svg">
+          <circle cx="50" cy="50" r="40" class="ex-svg-bg"/>
+          <circle cx="50" cy="50" r="40" class="ex-svg-arc" id="ex-arc"/>
+        </svg>
+        <div class="ex-timer-num" id="ex-timer-num"></div>
+      </div>
+      <div class="wl-foot">
+        <button class="btn btn-ghost"   onclick="stopWk()">Stop</button>
+        <button class="btn btn-primary" onclick="nextEx()">Skip →</button>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div id="wk-done" style="display:none">
+      <div class="wl-done">
+        <div class="wl-done-ico">🎉</div>
+        <div class="wl-done-msg">Great work! Routine complete.</div>
+        <button class="btn btn-primary" onclick="resetWk()">Do it again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SOUNDS MODAL ── -->
+<div class="overlay" id="mod-sounds" onclick="if(event.target===this)closeModule('sounds')">
+  <div class="wl-modal wl-modal-wide">
+    <div class="wl-modal-hd">
+      <div>
+        <h3>🎵 Soothing Sounds</h3>
+        <p class="wl-modal-sub">Search any of these on Spotify, YouTube, or your preferred app</p>
+      </div>
+      <button class="wl-x" onclick="closeModule('sounds')">×</button>
+    </div>
+    <div class="sounds-grid">
+      <div class="sound-card">
+        <div class="sound-ico">🌧️</div>
+        <div class="sound-name">Rain & Thunderstorm</div>
+        <div class="sound-desc">The steady patter of rain lowers cortisol and eases the mind into rest.</div>
+        <div class="sound-search">Try: "Heavy Rain on Window" · "Thunderstorm Sleep"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">🌲</div>
+        <div class="sound-name">Forest & Birdsong</div>
+        <div class="sound-desc">Birdsong and rustling leaves activate the parasympathetic nervous system.</div>
+        <div class="sound-search">Try: "Forest Morning Sounds" · "Woodland Ambience"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">🌊</div>
+        <div class="sound-name">Ocean Waves</div>
+        <div class="sound-desc">The rhythmic repetition of waves creates a natural grounding effect.</div>
+        <div class="sound-search">Try: "Gentle Ocean Waves" · "Beach Ambience for Sleep"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">🟫</div>
+        <div class="sound-name">Brown Noise</div>
+        <div class="sound-desc">Deeper than white noise — masks distractions without harsh frequencies.</div>
+        <div class="sound-search">Try: "Brown Noise Focus" · "Deep Brown Noise ADHD"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">🎧</div>
+        <div class="sound-name">Lo-Fi Beats</div>
+        <div class="sound-desc">Slow BPM jazzy instrumentals — mellow enough to stay out of your way.</div>
+        <div class="sound-search">Try: "Lofi Hip Hop Study" · "Chilled Cow Radio"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">🔔</div>
+        <div class="sound-name">Tibetan Bowls</div>
+        <div class="sound-desc">Resonant harmonics that gently slow brainwave activity toward calm.</div>
+        <div class="sound-search">Try: "Tibetan Singing Bowls" · "Crystal Bowl Meditation"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">🎹</div>
+        <div class="sound-name">Piano & Ambient</div>
+        <div class="sound-desc">Gentle solo piano for quiet focus — Nils Frahm, Max Richter, Brian Eno.</div>
+        <div class="sound-search">Try: "Nils Frahm Solo" · "Max Richter Sleep" · "Brian Eno Ambient 1"</div>
+      </div>
+      <div class="sound-card">
+        <div class="sound-ico">☕</div>
+        <div class="sound-name">Café Hum</div>
+        <div class="sound-desc">Light background chatter that simulates a productive coffee shop environment.</div>
+        <div class="sound-search">Try: "Coffee Shop Ambience" · "Café Background Noise"</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── GRATITUDE MODAL ── -->
+<div class="overlay" id="mod-gratitude" onclick="if(event.target===this)closeModule('gratitude')">
+  <div class="wl-modal">
+    <div class="wl-modal-hd">
+      <div>
+        <h3>🌱 Gratitude Journal</h3>
+        <p class="wl-modal-sub" id="grat-date-lbl"></p>
+      </div>
+      <button class="wl-x" onclick="closeModule('gratitude')">×</button>
+    </div>
+
+    <p class="grat-prompt" id="grat-prompt"></p>
+
+    <div id="grat-entry-section">
+      <div class="grat-inputs">
+        <input class="grat-in" id="grat-0" type="text" placeholder="I'm grateful for…"        autocomplete="off">
+        <input class="grat-in" id="grat-1" type="text" placeholder="Something that made me smile…" autocomplete="off">
+        <input class="grat-in" id="grat-2" type="text" placeholder="A small win today…"        autocomplete="off">
+      </div>
+      <div class="wl-foot">
+        <button class="btn btn-primary" onclick="saveGrat()">Save today's entry</button>
+      </div>
+    </div>
+
+    <div id="grat-today-view"></div>
+
+    <div class="grat-past-bar">
+      <button class="grat-past-btn" id="grat-past-btn" onclick="togglePastJournals()">Past Journals</button>
+    </div>
+
+    <div id="grat-past-section" style="display:none">
+      <div class="grat-date-pills" id="grat-date-pills"></div>
+      <div id="grat-past-view"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Module open / close ──────────────────────────────────────────────────────
+function openModule(id) {
+  document.getElementById('mod-' + id).classList.add('open');
+  if (id === 'meditation') initMeditation();
+  if (id === 'workout')    initWorkout();
+  if (id === 'gratitude')  initGratitude();
+}
+function closeModule(id) {
+  document.getElementById('mod-' + id).classList.remove('open');
+  if (id === 'meditation') stopBreath();
+  if (id === 'workout')    stopWk();
+}
+
+// ── MEDITATION ───────────────────────────────────────────────────────────────
+const TECHS = [
+  {
+    name:   'Box Breathing',
+    phases: [
+      { label: 'Inhale', secs: 4 },
+      { label: 'Hold',   secs: 4 },
+      { label: 'Exhale', secs: 4 },
+      { label: 'Hold',   secs: 4 },
+    ],
+    tip: 'Equal intervals train your nervous system into a calm, regulated state. Used by Navy SEALs and therapists alike.',
+  },
+  {
+    name:   '4-7-8',
+    phases: [
+      { label: 'Inhale', secs: 4 },
+      { label: 'Hold',   secs: 7 },
+      { label: 'Exhale', secs: 8 },
+    ],
+    tip: 'The long exhale activates the vagus nerve, triggering a deep relaxation response — great before sleep or after a stressful meeting.',
+  },
+  {
+    name:   'Deep Belly Breath',
+    phases: [
+      { label: 'Inhale', secs: 4 },
+      { label: 'Exhale', secs: 6 },
+    ],
+    tip: 'Belly breathing fully engages the diaphragm. Ideal for a quick reset — even 3 cycles can meaningfully lower heart rate.',
+  },
+];
+
+let _medTech   = 0;
+let _medRunning = false;
+let _medPhaseIdx = 0;
+let _medCycles  = 0;
+let _medTimer   = null;
+
+function initMeditation() {
+  selectTech(0);
+}
+
+function selectTech(i) {
+  if (_medRunning) stopBreath();
+  _medTech = i;
+  document.querySelectorAll('#med-tabs .wl-tab').forEach((b, j) => b.classList.toggle('active', j === i));
+  document.getElementById('med-tip').textContent          = TECHS[i].tip;
+  document.getElementById('breath-txt').textContent       = 'Press Begin';
+  document.getElementById('breath-phase-lbl').textContent = '';
+  document.getElementById('med-cycles-lbl').textContent   = '';
+  const ring = document.getElementById('breath-ring');
+  ring.style.transition  = 'none';
+  ring.style.transform   = 'scale(0.7)';
+  ring.style.boxShadow   = '';
+}
+
+function startBreath() {
+  _medRunning  = true;
+  _medPhaseIdx = 0;
+  _medCycles   = 0;
+  document.getElementById('med-start-btn').style.display = 'none';
+  document.getElementById('med-stop-btn').style.display  = '';
+  document.getElementById('med-cycles-lbl').textContent  = '';
+  doPhase();
+}
+
+function doPhase() {
+  if (!_medRunning) return;
+  const tech  = TECHS[_medTech];
+  const phase = tech.phases[_medPhaseIdx % tech.phases.length];
+  const ring  = document.getElementById('breath-ring');
+
+  document.getElementById('breath-phase-lbl').textContent = phase.label;
+  document.getElementById('breath-txt').textContent       = phase.secs;
+
+  if (phase.label === 'Inhale') {
+    requestAnimationFrame(() => {
+      ring.style.transition = `transform ${phase.secs}s ease-in-out, box-shadow ${phase.secs}s ease-in-out`;
+      ring.style.transform  = 'scale(1.35)';
+      ring.style.boxShadow  = '0 0 48px rgba(92,200,204,0.35)';
+    });
+  } else if (phase.label === 'Exhale') {
+    requestAnimationFrame(() => {
+      ring.style.transition = `transform ${phase.secs}s ease-in-out, box-shadow ${phase.secs}s ease-in-out`;
+      ring.style.transform  = 'scale(0.7)';
+      ring.style.boxShadow  = '0 0 12px rgba(92,200,204,0.08)';
+    });
+  }
+
+  let elapsed = 0;
+  _medTimer = setInterval(() => {
+    if (!_medRunning) { clearInterval(_medTimer); return; }
+    elapsed++;
+    const left = phase.secs - elapsed;
+    document.getElementById('breath-txt').textContent = left > 0 ? left : '·';
+    if (elapsed >= phase.secs) {
+      clearInterval(_medTimer);
+      _medTimer = null;
+      _medPhaseIdx++;
+      if (_medPhaseIdx % tech.phases.length === 0) {
+        _medCycles++;
+        const c = _medCycles;
+        document.getElementById('med-cycles-lbl').textContent =
+          `${c} cycle${c === 1 ? '' : 's'} complete`;
+      }
+      setTimeout(() => { if (_medRunning) doPhase(); }, 180);
+    }
+  }, 1000);
+}
+
+function stopBreath() {
+  _medRunning = false;
+  if (_medTimer) { clearInterval(_medTimer); _medTimer = null; }
+  const ring     = document.getElementById('breath-ring');
+  const startBtn = document.getElementById('med-start-btn');
+  const stopBtn  = document.getElementById('med-stop-btn');
+  if (ring) {
+    ring.style.transition = 'transform 0.5s ease-out, box-shadow 0.5s ease-out';
+    ring.style.transform  = 'scale(0.7)';
+    ring.style.boxShadow  = '';
+    document.getElementById('breath-txt').textContent       = 'Press Begin';
+    document.getElementById('breath-phase-lbl').textContent = '';
+  }
+  if (startBtn) startBtn.style.display = '';
+  if (stopBtn)  stopBtn.style.display  = 'none';
+}
+
+// ── WORKOUT ──────────────────────────────────────────────────────────────────
+const ROUTINES = [
+  {
+    exercises: [
+      { name: 'Neck Rolls',          detail: 'Slow circles — 5 each direction, keep shoulders relaxed', secs: 30 },
+      { name: 'Shoulder Shrugs',     detail: 'Lift to ears, hold 2s, release. Repeat 10×',             secs: 30 },
+      { name: 'Seated Spinal Twist', detail: 'Twist gently left then right, hold 3s each side',        secs: 35 },
+      { name: 'Standing Cat-Cow',    detail: 'Arch and round your back slowly, 8 full cycles',         secs: 40 },
+      { name: 'Forward Fold',        detail: 'Hinge at hips, let arms hang heavy, breathe deeply',     secs: 40 },
+      { name: 'Deep Breath Finish',  detail: '5 slow belly breaths — inhale 4s, exhale 6s',            secs: 40 },
+    ],
+  },
+  {
+    exercises: [
+      { name: 'Jumping Jacks',     detail: 'Get that heart rate up!',                                secs: 40 },
+      { name: 'High Knees',        detail: 'Drive knees to hip height — quick pace',                  secs: 40 },
+      { name: 'Push-Ups',         detail: '10 reps — modify on knees if needed',                     secs: 45 },
+      { name: 'Bodyweight Squats', detail: '15 reps — push through heels, chest tall',               secs: 45 },
+      { name: 'Mountain Climbers', detail: 'Fast feet, core tight, hips level',                      secs: 40 },
+      { name: 'Plank Hold',        detail: 'Straight line from head to heels — stay strong',          secs: 40 },
+      { name: 'Glute Bridges',     detail: '15 reps — squeeze hard at the top, slow down',           secs: 45 },
+      { name: 'Cool-Down Stretch', detail: 'Hip flexors, hamstrings, shoulders — hold each 20s',     secs: 60 },
+    ],
+  },
+  {
+    exercises: [
+      { name: 'Burpees',            detail: '10 full reps — chest to floor, jump at the top',        secs: 50 },
+      { name: 'Jump Squats',        detail: 'Explode upward, land softly, absorb with your legs',    secs: 45 },
+      { name: 'Push-Up Variations', detail: 'Wide, narrow, or diamond — 12 reps each set',           secs: 50 },
+      { name: 'Reverse Lunges',     detail: '10 reps each leg — back knee hovers 1 inch',            secs: 50 },
+      { name: 'Tricep Dips',        detail: 'Use a sturdy chair — 15 reps, elbows back',             secs: 45 },
+      { name: 'Bicycle Crunches',   detail: '20 slow, controlled reps — opposite elbow to knee',     secs: 45 },
+      { name: 'Lateral Shuffles',   detail: '5 steps each way — stay low, stay quick',               secs: 40 },
+      { name: 'Superman Holds',     detail: '10 reps — lift arms and legs simultaneously, hold 2s',  secs: 45 },
+      { name: 'Squat to Press',     detail: 'Use anything weighted — 12 reps, full range',           secs: 50 },
+      { name: 'Full-Body Stretch',  detail: 'You earned this — hold each stretch for 20–30s',        secs: 90 },
+    ],
+  },
+];
+
+let _routineIdx = 0;
+let _exIdx      = 0;
+let _wkTimer    = null;
+let _wkRunning  = false;
+let _exSecs     = 0;
+let _exTotal    = 0;
+let _isRest     = false;
+
+function initWorkout() {
+  selectRoutine(0);
+}
+
+function selectRoutine(i) {
+  _routineIdx = i;
+  document.querySelectorAll('#wk-tabs .wl-tab').forEach((b, j) => b.classList.toggle('active', j === i));
+  renderRoutineList();
+}
+
+function renderRoutineList() {
+  const exs = ROUTINES[_routineIdx].exercises;
+  document.getElementById('routine-list').innerHTML = exs.map((ex, i) =>
+    `<div class="ex-preview-row">
+      <span class="ex-num">${i + 1}</span>
+      <div>
+        <div class="ex-prev-name">${ex.name}</div>
+        <div class="ex-prev-detail">${ex.detail} · ${ex.secs}s</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function startWk() {
+  _exIdx     = 0;
+  _wkRunning = true;
+  _isRest    = false;
+  document.getElementById('wk-idle').style.display   = 'none';
+  document.getElementById('wk-active').style.display = '';
+  document.getElementById('wk-done').style.display   = 'none';
+  runEx();
+}
+
+function runEx() {
+  const exs = ROUTINES[_routineIdx].exercises;
+  const ex  = exs[_exIdx];
+  _exTotal  = ex.secs;
+  _exSecs   = ex.secs;
+  _isRest   = false;
+
+  const total = exs.length;
+  document.getElementById('ex-step-lbl').textContent = `Exercise ${_exIdx + 1} of ${total}`;
+  document.getElementById('ex-name').textContent     = ex.name;
+  document.getElementById('ex-detail').textContent   = ex.detail;
+  document.getElementById('ex-prog-fill').style.width = `${(_exIdx / total) * 100}%`;
+  updateExArc();
+
+  _wkTimer = setInterval(() => {
+    _exSecs--;
+    updateExArc();
+    if (_exSecs <= 0) {
+      clearInterval(_wkTimer);
+      _wkTimer = null;
+      nextEx();
+    }
+  }, 1000);
+}
+
+function runRest() {
+  const next = ROUTINES[_routineIdx].exercises[_exIdx];
+  _exTotal = 8;
+  _exSecs  = 8;
+  _isRest  = true;
+
+  document.getElementById('ex-step-lbl').textContent = 'Rest';
+  document.getElementById('ex-name').textContent     = 'Rest';
+  document.getElementById('ex-detail').textContent   = `Up next: ${next.name}`;
+  updateExArc();
+
+  _wkTimer = setInterval(() => {
+    _exSecs--;
+    updateExArc();
+    if (_exSecs <= 0) {
+      clearInterval(_wkTimer);
+      _wkTimer = null;
+      runEx();
+    }
+  }, 1000);
+}
+
+function updateExArc() {
+  const circ   = 2 * Math.PI * 40;
+  const pct    = _exSecs / _exTotal;
+  const offset = circ * (1 - pct);
+  const arc    = document.getElementById('ex-arc');
+  arc.style.strokeDasharray  = circ;
+  arc.style.strokeDashoffset = offset;
+  document.getElementById('ex-timer-num').textContent = _exSecs;
+}
+
+function nextEx() {
+  clearInterval(_wkTimer);
+  _wkTimer = null;
+  if (_isRest) { runEx(); return; }
+  _exIdx++;
+  const exs = ROUTINES[_routineIdx].exercises;
+  if (_exIdx >= exs.length) {
+    document.getElementById('ex-prog-fill').style.width = '100%';
+    document.getElementById('wk-active').style.display = 'none';
+    document.getElementById('wk-done').style.display   = '';
+    _wkRunning = false;
+    return;
+  }
+  runRest();
+}
+
+function stopWk() {
+  clearInterval(_wkTimer);
+  _wkTimer   = null;
+  _wkRunning = false;
+  document.getElementById('wk-idle').style.display   = '';
+  document.getElementById('wk-active').style.display = 'none';
+  document.getElementById('wk-done').style.display   = 'none';
+  renderRoutineList();
+}
+
+function resetWk() {
+  stopWk();
+}
+
+// ── GRATITUDE JOURNAL ────────────────────────────────────────────────────────
+const GRAT_PROMPTS = [
+  'What three things brought you comfort or joy today?',
+  'Who made your day a little better recently?',
+  'What\'s one thing your body did today that you appreciate?',
+  'What challenge taught you something this week?',
+  'What small moment went unnoticed but deserved your attention?',
+  'What part of your routine are you quietly thankful for?',
+  'What would you miss if it were suddenly gone?',
+];
+
+function initGratitude() {
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  document.getElementById('grat-date-lbl').textContent = today;
+  document.getElementById('grat-prompt').textContent   = GRAT_PROMPTS[new Date().getDay() % GRAT_PROMPTS.length];
+
+  const saved   = JSON.parse(localStorage.getItem('grat-' + todayStr()) || 'null');
+  const section = document.getElementById('grat-entry-section');
+
+  if (saved) {
+    section.style.display = 'none';
+    document.getElementById('grat-today-view').innerHTML = renderGratBlock(saved, 'Today');
+  } else {
+    section.style.display = '';
+    document.getElementById('grat-today-view').innerHTML = '';
+    [0, 1, 2].forEach(i => { document.getElementById('grat-' + i).value = ''; });
+  }
+
+  // Reset past journals panel
+  document.getElementById('grat-past-section').style.display = 'none';
+  document.getElementById('grat-past-btn').textContent        = 'Past Journals';
+  document.getElementById('grat-date-pills').innerHTML        = '';
+  document.getElementById('grat-past-view').innerHTML         = '';
+}
+
+function saveGrat() {
+  const entries = [0, 1, 2]
+    .map(i => document.getElementById('grat-' + i).value.trim())
+    .filter(Boolean);
+  if (!entries.length) return;
+  localStorage.setItem('grat-' + todayStr(), JSON.stringify(entries));
+  initGratitude();
+}
+
+function togglePastJournals() {
+  const section = document.getElementById('grat-past-section');
+  const btn     = document.getElementById('grat-past-btn');
+  const opening = section.style.display === 'none';
+  section.style.display = opening ? '' : 'none';
+  btn.textContent = opening ? 'Past Journals ↑' : 'Past Journals';
+  if (opening) populatePastDates();
+}
+
+function populatePastDates() {
+  const today = todayStr();
+  const found = [];
+  for (let i = 1; i <= 7; i++) {
+    const d   = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    if (localStorage.getItem('grat-' + key)) found.push({ key, d });
+  }
+
+  const pills = document.getElementById('grat-date-pills');
+  if (!found.length) {
+    pills.innerHTML = '<div class="grat-no-past">No past entries yet — come back tomorrow!</div>';
+    return;
+  }
+  pills.innerHTML = found.map(({ key, d }) => {
+    const lbl = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return `<button class="grat-date-pill" onclick="selectPastDate('${key}', this)">${lbl}</button>`;
+  }).join('');
+  document.getElementById('grat-past-view').innerHTML = '';
+}
+
+function selectPastDate(key, el) {
+  document.querySelectorAll('.grat-date-pill').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const saved = JSON.parse(localStorage.getItem('grat-' + key) || 'null');
+  const d     = new Date(key + 'T12:00:00');
+  const lbl   = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  document.getElementById('grat-past-view').innerHTML = saved ? renderGratBlock(saved, lbl) : '';
+}
+
+function renderGratBlock(entries, label) {
+  const items = entries.map(e => `<div class="grat-item">🌿 ${escHtml(e)}</div>`).join('');
+  return `<div class="grat-saved">
+    <div class="grat-saved-lbl">${escHtml(label)}</div>
+    ${items}
+  </div>`;
+}
+</script>
+{% endblock %}
