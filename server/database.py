@@ -41,6 +41,8 @@ def _migrate(app):
     with app.app_context():
         db = get_db()
         existing = {row[1] for row in db.execute('PRAGMA table_info(break_activities)').fetchall()}
+        if not existing:
+            return  # table not created yet; schema.sql already includes all columns
         if 'is_blocked' not in existing:
             db.execute('ALTER TABLE break_activities ADD COLUMN is_blocked INTEGER DEFAULT 0')
             db.commit()

@@ -91,3 +91,51 @@ def test_summary_persists_on_get(client):
     client.post(f'/api/reflections/{DATE}/summary')
     r = client.get(f'/api/reflections/{DATE}')
     assert r.get_json()['ai_summary'] is not None
+
+
+# ── Uniqueness constraint ─────────────────────────────────────────────────────
+
+def test_duplicate_reflection_returns_409(client):
+    client.post('/api/reflections', json={'date': DATE, 'mood': 3})
+    r = client.post('/api/reflections', json={'date': DATE, 'mood': 5})
+    assert r.status_code == 409
+
+
+def test_duplicate_reflection_error_body(client):
+    client.post('/api/reflections', json={'date': DATE, 'mood': 3})
+    r = client.post('/api/reflections', json={'date': DATE, 'mood': 5})
+    assert 'error' in r.get_json()
+
+
+# ── Future date rejection ─────────────────────────────────────────────────────
+
+FUTURE = '2099-01-01'
+
+
+def test_create_reflection_future_date_rejected(client):
+    r = client.post('/api/reflections', json={'date': FUTURE, 'mood': 3})
+    assert r.status_code == 400
+
+
+def test_update_reflection_future_date_rejected(client):
+    r = client.put(f'/api/reflections/{FUTURE}', json={'mood': 3})
+    assert r.status_code == 400
+
+
+# ── Update validation ─────────────────────────────────────────────────────────
+
+def test_update_reflection_no_valid_fields_returns_400(client):
+    client.post('/api/reflections', json={'date': DATE, 'mood': 3})
+    r = client.put(f'/api/reflections/{DATE}', json={'unknown_field': 'value'})
+    assert r.status_code == 400
+
+
+def test_update_reflection_all_three_valid_fields(client):
+    client.post('/api/reflections', json={'date': DATE, 'mood': 1, 'notes': 'rough start'})
+    r = client.put(f'/api/reflections/{DATE}', json={
+        'mood': 5, 'notes': 'turned around', 'ai_summary': 'A good recovery day.'
+    })
+    data = r.get_json()
+    assert data['mood'] == 5
+    assert data['notes'] == 'turned around'
+    assert data['ai_summary'] == 'A good recovery day.'
