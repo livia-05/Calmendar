@@ -1,7 +1,5 @@
 # API Reference
 
-Base URL: `http://127.0.0.1:5000`
-
 All request and response bodies are JSON. Dates use the format `YYYY-MM-DD` and times use `HH:MM` (24-hour).
 
 ---
